@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scripts": [
+    {
+      "id": "demo",
+      "name": "Demonstração da Central",
+      "version": "1.0.0",
+      "file": "scripts/demo.js",
+      "sha256": "f16b9ab3ff0f1715128965004a37bc79e05b78bc885923085f43a149119c660e",
+      "matches": [
+        "https://example.com/*"
+      ],
+      "enabled": true
+    }
+  ]
+}
