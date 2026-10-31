@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Central GitHub | Script Mestre
 // @namespace    central-github-tampermonkey
-// @version      1.2.0
-// @description  Central V1.2: carrega módulos do GitHub e exibe diagnóstico de todos os scripts e suas condições de exibição.
+// @version      1.3.0
+// @description  Central V1.3: diagnóstico, botão flutuante arrastável e posição salva no Tampermonkey.
 // @match        http://*/*
 // @match        https://*/*
 // @run-at       document-idle
@@ -198,7 +198,7 @@
 
   function gerarDiagnostico() {
     const linhas = [
-      'CENTRAL GITHUB 1.2 — DIAGNÓSTICO',
+      'CENTRAL GITHUB 1.3 — DIAGNÓSTICO',
       'Repositório: ' + REPOSITORIO,
       'Página: ' + location.origin + location.pathname,
       'Módulos no catálogo: ' + (catalogo?.scripts?.length || 0),
@@ -280,21 +280,149 @@
     }
   }
 
+  // A posição fica salva no Tampermonkey e vale para todas as páginas.
+  // Valores proporcionais à janela permitem manter o botão visível após mudar a resolução.
+  const CHAVE_POSICAO = PREFIXO + 'botao:posicao-v1';
+  const BORDA = 10;
+  const RECUO_INICIAL = 16;
+
+  function limitar(valor, minimo, maximo) {
+    return Math.max(minimo, Math.min(maximo, valor));
+  }
+
+  function areaBotao() {
+    const botao = interfaceUI?.abrir;
+    return {
+      largura: botao?.offsetWidth || 120,
+      altura: botao?.offsetHeight || 39,
+      viewportL: Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0),
+      viewportA: Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)
+    };
+  }
+
+  function colocarBotao(x, y) {
+    if (!interfaceUI) return;
+    const area = areaBotao();
+    const limiteX = Math.max(BORDA, area.viewportL - area.largura - BORDA);
+    const limiteY = Math.max(BORDA, area.viewportA - area.altura - BORDA);
+    const posX = limitar(x, BORDA, limiteX);
+    const posY = limitar(y, BORDA, limiteY);
+    interfaceUI.root.style.left = `${Math.round(posX)}px`;
+    interfaceUI.root.style.top = `${Math.round(posY)}px`;
+    if (painelAberto) ajustarPosicaoPainel();
+  }
+
+  function salvarPosicaoBotao() {
+    if (!interfaceUI) return;
+    const rect = interfaceUI.abrir.getBoundingClientRect();
+    const area = areaBotao();
+    const maxX = Math.max(1, area.viewportL - area.largura);
+    const maxY = Math.max(1, area.viewportA - area.altura);
+    GM_setValue(CHAVE_POSICAO, {
+      x: limitar(rect.left / maxX, 0, 1),
+      y: limitar(rect.top / maxY, 0, 1)
+    });
+  }
+
+  function restaurarPosicaoBotao() {
+    if (!interfaceUI) return;
+    const dados = GM_getValue(CHAVE_POSICAO, null);
+    const area = areaBotao();
+    const valido = dados && Number.isFinite(dados.x) && Number.isFinite(dados.y);
+    if (valido) {
+      colocarBotao(dados.x * Math.max(0, area.viewportL - area.largura),
+                   dados.y * Math.max(0, area.viewportA - area.altura));
+    } else {
+      colocarBotao(RECUO_INICIAL, area.viewportA - area.altura - RECUO_INICIAL);
+    }
+  }
+
+  // O painel abre acima ou abaixo do botão, sem ultrapassar as bordas da janela.
+  function ajustarPosicaoPainel() {
+    if (!interfaceUI || !painelAberto) return;
+    const { abrir, painel } = interfaceUI;
+    const area = areaBotao();
+    const rect = abrir.getBoundingClientRect();
+    const margem = 12;
+    const espacamento = 8;
+    const largura = Math.max(180, Math.min(420, area.viewportL - margem * 2));
+    painel.style.width = `${largura}px`;
+    const alvoX = limitar(rect.left, margem, Math.max(margem, area.viewportL - largura - margem));
+    painel.style.left = `${Math.round(alvoX - rect.left)}px`;
+    const acima = Math.max(0, rect.top - margem - espacamento);
+    const abaixo = Math.max(0, area.viewportA - rect.bottom - margem - espacamento);
+    const alturaDesejada = Math.min(painel.scrollHeight || 400, area.viewportA - margem * 2);
+    const colocarAcima = (acima >= alturaDesejada) || (acima > abaixo);
+    painel.style.maxHeight = `${Math.max(30, colocarAcima ? acima : abaixo)}px`;
+    if (colocarAcima) {
+      painel.style.top = 'auto';
+      painel.style.bottom = `calc(100% + ${espacamento}px)`;
+    } else {
+      painel.style.bottom = 'auto';
+      painel.style.top = `calc(100% + ${espacamento}px)`;
+    }
+  }
+
   function prepararPainel() {
     if (interfaceUI || !document.body) return;
     const root = document.createElement('div');
     root.id = 'central-github-interface';
     const abrir = document.createElement('button');
+    abrir.type = 'button';
     abrir.className = 'central-github-botao';
+    abrir.textContent = '⚙ Central 0/0'; // Define largura antes de restaurar a posição salva.
+    abrir.title = 'Clique para abrir a Central; arraste para mover e salvar a posição.';
+    abrir.setAttribute('aria-label', 'Central GitHub. Clique para abrir ou arraste para mover.');
     const painel = document.createElement('section');
     painel.className = 'central-github-painel';
-    abrir.addEventListener('click', () => {
-      painelAberto = !painelAberto;
-      atualizarPainel(true);
-    });
     root.append(abrir, painel);
     document.body.appendChild(root);
     interfaceUI = { root, abrir, painel };
+    restaurarPosicaoBotao();
+
+    let arrasto = null;
+    let ignorarProximoClique = false;
+    abrir.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      ignorarProximoClique = false;
+      const rect = abrir.getBoundingClientRect();
+      arrasto = { id: e.pointerId, inicialX: e.clientX, inicialY: e.clientY,
+        esquerda: rect.left, topo: rect.top, moveu: false };
+      try { abrir.setPointerCapture(e.pointerId); } catch (_) { /* opcional */ }
+    });
+    abrir.addEventListener('pointermove', e => {
+      if (!arrasto || e.pointerId !== arrasto.id) return;
+      const dx = e.clientX - arrasto.inicialX;
+      const dy = e.clientY - arrasto.inicialY;
+      if (!arrasto.moveu && Math.hypot(dx, dy) < 6) return;
+      arrasto.moveu = true;
+      abrir.classList.add('arrastando');
+      colocarBotao(arrasto.esquerda + dx, arrasto.topo + dy);
+      e.preventDefault();
+    });
+    function encerrarArrasto(e) {
+      if (!arrasto || e.pointerId !== arrasto.id) return;
+      if (arrasto.moveu) {
+        salvarPosicaoBotao();
+        ignorarProximoClique = true;
+      }
+      arrasto = null;
+      abrir.classList.remove('arrastando');
+      try { if (abrir.hasPointerCapture(e.pointerId)) abrir.releasePointerCapture(e.pointerId); } catch (_) { /* opcional */ }
+    }
+    abrir.addEventListener('pointerup', encerrarArrasto);
+    abrir.addEventListener('pointercancel', encerrarArrasto);
+    abrir.addEventListener('click', e => {
+      if (ignorarProximoClique) {
+        ignorarProximoClique = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      painelAberto = !painelAberto;
+      atualizarPainel(true);
+    });
+    window.addEventListener('resize', restaurarPosicaoBotao, { passive: true });
   }
 
   function texto(tag, conteudo, classe = '') {
@@ -319,8 +447,10 @@
     painel.style.display = painelAberto ? 'block' : 'none';
     if (!painelAberto) return;
     painel.replaceChildren();
-    painel.appendChild(texto('h3', 'Central GitHub — Diagnóstico V1.2'));
+    painel.appendChild(texto('h3', 'Central GitHub — Diagnóstico V1.3'));
     painel.appendChild(texto('p', aviso, 'central-msg'));
+    painel.appendChild(texto('p', 'Arraste o botão ⚙ Central pela tela. A posição será lembrada nas próximas visitas.', 'central-legenda'));
+
     painel.appendChild(texto('p', `${todos.length} script(s) no GitHub • ${relevantes.length} compatível(is) com esta URL • ${carregados} código(s) executado(s)`, 'central-legenda'));
     painel.appendChild(texto('p', 'Página: ' + location.origin + location.pathname, 'central-legenda'));
     if (ultimaSincronizacao) {
@@ -379,18 +509,22 @@
     botoes.append(atualizar, copiar);
     painel.appendChild(botoes);
     painel.appendChild(texto('p', 'O status "Código executado" não significa que o módulo criou um botão: ele pode depender de uma tela ou campo específico.', 'central-legenda'));
+    ajustarPosicaoPainel();
   }
 
   GM_addStyle(`
-    #central-github-interface { position:fixed; left:16px; bottom:16px; z-index:2147483647;
+    #central-github-interface { position:fixed; left:16px; top:calc(100vh - 55px); bottom:auto; right:auto;
+      z-index:2147483647; width:max-content; height:max-content;
       font:13px/1.5 'Segoe UI',Arial,sans-serif; color:#172033; }
     #central-github-interface * {box-sizing:border-box}
-    #central-github-interface .central-github-botao {display:block;margin-right:auto; border:0;
+    #central-github-interface .central-github-botao {display:block; border:0;
       padding:10px 14px; border-radius:20px; background:#1c3872;color:white;
-      font:600 13px 'Segoe UI',Arial,sans-serif;box-shadow:0 8px 25px #0003;cursor:pointer}
-    #central-github-interface .central-github-painel { width:min(420px,calc(100vw - 24px));
-      max-height:70vh;overflow-y:auto;background:#fff;border-radius:14px;margin-bottom:8px;
-      padding:16px;box-shadow:0 14px 40px #0004;border:1px solid #e1e7f0;}
+      font:600 13px 'Segoe UI',Arial,sans-serif;box-shadow:0 8px 25px #0003;cursor:grab;
+      touch-action:none; user-select:none; -webkit-user-select:none; white-space:nowrap}
+    #central-github-interface .central-github-botao.arrastando {cursor:grabbing;opacity:.92}
+    #central-github-interface .central-github-painel {position:absolute; left:0; top:auto; bottom:calc(100% + 8px);
+      width:min(420px,calc(100vw - 24px)); max-height:70vh;overflow-y:auto;background:#fff;
+      border-radius:14px;margin:0; padding:16px;box-shadow:0 14px 40px #0004;border:1px solid #e1e7f0;}
     #central-github-interface h3 {font:700 16px 'Segoe UI',Arial,sans-serif;margin:0 0 10px}
     #central-github-interface p {margin:6px 0;word-break:break-word}
     #central-github-interface .central-msg {color:#475569}
