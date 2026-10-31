@@ -24,6 +24,17 @@
       "enabled": true
     },
     {
+      "id": "romance-botao-colar-cpf",
+      "name": "Romance - Botão Colar CPF",
+      "version": "1.0",
+      "file": "scripts/romance-botao-colar-cpf.js",
+      "sha256": "f981038f8d2102166b05d98f9cd10c68b8a684fb69e0a0baea106511c8212eb2",
+      "matches": [
+        "https://sistema.romancemoda.com.br/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "sistema-romance-atalhos-rapidos",
       "name": "Sistema Romance - Atalhos Rápidos",
       "version": "1.2.0",
