@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Central GitHub | Script Mestre
 // @namespace    central-github-tampermonkey
-// @version      1.4.0
-// @description  Central V1.4: clique ativa posicionamento, duplo clique abre painel, e posição fica salva.
+// @version      1.5.0
+// @description  Central V1.5: clique com atraso inteligente para mover; duplo clique abre painel sem conflitos.
 // @match        http://*/*
 // @match        https://*/*
 // @run-at       document-idle
@@ -391,6 +391,8 @@
     let pontoInicio = null;
     let toqueEmMovimento = false;
     let ignorarClickAte = 0;
+    let temporizadorClique = null;
+    const ESPERA_DUPLO_CLIQUE_MS = 430;
 
     function indicarModo() {
       abrir.classList.toggle('modo-mover', modoMover);
@@ -424,25 +426,35 @@
       indicarModo();
     }
 
+    // Evita um conflito da V1.4: o primeiro clique só ativa o movimento
+    // após a pequena janela de reconhecimento do duplo clique. Assim o
+    // botão NÃO sai debaixo do cursor antes do segundo clique.
     abrir.addEventListener('click', e => {
-      // O arrasto por toque pode gerar um click sintético após pointerup.
-      if (Date.now() < ignorarClickAte) {
-        e.preventDefault();
+      e.preventDefault();
+      e.stopPropagation();
+      // Eventos de teclado já são tratados no keydown.
+      if (e.detail === 0 || Date.now() < ignorarClickAte) return;
+      const coordenadas = { clientX: e.clientX, clientY: e.clientY, detail: e.detail };
+      if (temporizadorClique !== null) {
+        clearTimeout(temporizadorClique);
+        temporizadorClique = null;
+        if (modoMover) finalizarMovimento(false);
+        painelAberto = !painelAberto;
+        atualizarPainel(true);
         return;
       }
-      e.preventDefault();
-      if (modoMover) finalizarMovimento(true);
-      else ativarMovimento(e);
+      temporizadorClique = setTimeout(() => {
+        temporizadorClique = null;
+        if (modoMover) finalizarMovimento(true);
+        else ativarMovimento(coordenadas);
+      }, ESPERA_DUPLO_CLIQUE_MS);
     });
 
+    // O duplo clique é reconhecido pelos próprios eventos click (inclusive
+    // em navegadores que não disparam dblclick de modo confiável).
     abrir.addEventListener('dblclick', e => {
       e.preventDefault();
       e.stopPropagation();
-      // Quando o segundo click de um duplo clique fixou ou iniciou o modo mover,
-      // desligamos esse modo antes de alternar a janela.
-      if (modoMover) finalizarMovimento(false);
-      painelAberto = !painelAberto;
-      atualizarPainel(true);
     });
 
     // Pointermove global em captura: continua movendo mesmo quando o mouse
@@ -496,7 +508,8 @@
         if (modoMover) finalizarMovimento(false);
         painelAberto = !painelAberto;
         atualizarPainel(true);
-        ignorarClickAte = Date.now() + 320;
+        ignorarClickAte = Date.now() + 450;
+        if (temporizadorClique !== null) { clearTimeout(temporizadorClique); temporizadorClique = null; }
       }
     }, true);
 
@@ -531,9 +544,9 @@
     painel.style.display = painelAberto ? 'block' : 'none';
     if (!painelAberto) return;
     painel.replaceChildren();
-    painel.appendChild(texto('h3', 'Central GitHub — Diagnóstico V1.4'));
+    painel.appendChild(texto('h3', 'Central GitHub — Diagnóstico V1.5'));
     painel.appendChild(texto('p', aviso, 'central-msg'));
-    painel.appendChild(texto('p', 'Um clique ativa o modo mover; mova o mouse e clique novamente para fixar. Dois cliques abrem ou fecham a Central. A posição fica salva.', 'central-legenda'));
+    painel.appendChild(texto('p', 'Clique uma vez para mover (após um instante), mova o cursor e clique para fixar. Dois cliques rápidos abrem ou fecham o painel. A posição fica salva.', 'central-legenda'));
 
     painel.appendChild(texto('p', `${todos.length} script(s) no GitHub • ${relevantes.length} compatível(is) com esta URL • ${carregados} código(s) executado(s)`, 'central-legenda'));
     painel.appendChild(texto('p', 'Página: ' + location.origin + location.pathname, 'central-legenda'));
