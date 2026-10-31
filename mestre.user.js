@@ -24,7 +24,7 @@
   'use strict';
 
   // >>> ALTERE APENAS ESTA LINHA ANTES DE INSTALAR <<<
-  const REPOSITORIO = 'SEU_USUARIO/central-tampermonkey';
+  const REPOSITORIO = 'jhonesfeliciano/central-tampermonkey';
 
   const RAMO = 'main';
   const INTERVALO_MS = 3 * 60 * 1000;
