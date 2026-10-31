@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Central GitHub | Script Mestre
 // @namespace    central-github-tampermonkey
-// @version      1.0.0
-// @description  Um único script no Tampermonkey. Lê catálogo do GitHub e carrega automaticamente os módulos por site.
+// @version      1.2.0
+// @description  Central V1.2: carrega módulos do GitHub e exibe diagnóstico de todos os scripts e suas condições de exibição.
 // @match        http://*/*
 // @match        https://*/*
 // @run-at       document-idle
@@ -168,6 +168,61 @@
     return script.matches.some(pattern => corresponde(pattern, location.href));
   }
 
+  function explicarExibicao(script) {
+    // Executar JS não garante que um botão será mostrado: cada módulo pode
+    // restringir internamente a sua própria interface à página/elemento certo.
+    if (!interessa(script)) return 'Este endereço não corresponde ao @central-match.';
+    if (!executados.has(script.id)) return 'Ainda não carregado pelo Script Mestre.';
+    if (script.id === 'romance-botao-colar-cpf') {
+      const campo = document.getElementById('P280_CPF');
+      if (!campo) return 'Código carregado, mas esta tela não tem o campo P280_CPF.';
+      if (document.getElementById('tm-btn-colar-cpf')) return 'Botão Colar encontrado nesta página.';
+      const wrapper = campo.closest('.t-Form-itemWrapper');
+      return wrapper
+        ? 'Campo CPF encontrado, mas o botão ainda não apareceu; verifique a execução do módulo.'
+        : 'Campo CPF encontrado, mas sem .t-Form-itemWrapper (estrutura esperada pelo módulo original).';
+    }
+    if (script.id === 'sistema-romance-atalhos-rapidos') {
+      const appId = document.getElementById('pFlowId')?.value || '';
+      const pageId = document.getElementById('pFlowStepId')?.value || '';
+      if (document.getElementById('lm-apex-atalhos-host')) {
+        return 'Painel de atalhos presente (pode estar fechado no botão redondo).';
+      }
+      if (appId !== '2001' || pageId !== '1') {
+        return 'Atalhos só aparecem na página inicial 1 do aplicativo 2001; logo pode aparecer em outras telas.';
+      }
+      return 'Página inicial reconhecida, mas o painel não foi criado; recarregue e confira o Console.';
+    }
+    return 'Código carregado. A interface depende das condições previstas neste módulo.';
+  }
+
+  function gerarDiagnostico() {
+    const linhas = [
+      'CENTRAL GITHUB 1.2 — DIAGNÓSTICO',
+      'Repositório: ' + REPOSITORIO,
+      'Página: ' + location.origin + location.pathname,
+      'Módulos no catálogo: ' + (catalogo?.scripts?.length || 0),
+      'Última consulta: ' + (ultimaSincronizacao?.toLocaleString('pt-BR') || 'não realizada'),
+      'Aviso: ' + aviso,
+      ''
+    ];
+    for (const script of catalogo?.scripts || []) {
+      const match = interessa(script);
+      const off = GM_getValue(PREFIXO + 'desligado:' + script.id, false);
+      const status = !script.enabled ? 'DESATIVADO NO GITHUB'
+        : off ? 'DESATIVADO NO NAVEGADOR'
+        : falhas.has(script.id) ? 'ERRO: ' + falhas.get(script.id)
+        : atualizacoesPendentes.has(script.id) ? 'NOVA VERSÃO: recarregar'
+        : executados.has(script.id) ? 'ARQUIVO EXECUTADO'
+        : match ? 'AGUARDANDO' : 'OUTRA PÁGINA';
+      linhas.push(script.name + ' (v' + script.version + ')');
+      linhas.push('  ' + script.file + ' | ' + status);
+      linhas.push('  ' + explicarExibicao(script));
+      linhas.push('  match: ' + script.matches.join(', '));
+    }
+    return linhas.join('\n');
+  }
+
   async function sincronizar() {
     if (!REPO_VALIDO) {
       aviso = 'Configure SEU_USUARIO no Script Mestre.';
@@ -251,30 +306,30 @@
 
   function atualizarPainel(forcar = false) {
     if (!document.body) return;
-    const relevantes = catalogo ? catalogo.scripts.filter(interessa) : [];
+    const todos = catalogo ? catalogo.scripts : [];
+    const relevantes = todos.filter(interessa);
     const deveMostrar = !REPO_VALIDO || relevantes.length > 0 || painelAberto || aviso.startsWith('Erro') || forcar;
     if (!deveMostrar && !interfaceUI) return;
     prepararPainel();
     if (!interfaceUI) return;
     const { root, abrir, painel } = interfaceUI;
     root.style.display = deveMostrar ? '' : 'none';
-    const qtd = relevantes.filter(s => executados.has(s.id)).length;
-    abrir.textContent = `⚙ Central ${qtd}/${relevantes.length}`;
+    const carregados = relevantes.filter(s => executados.has(s.id)).length;
+    abrir.textContent = `⚙ Central ${carregados}/${relevantes.length}`;
     painel.style.display = painelAberto ? 'block' : 'none';
     if (!painelAberto) return;
     painel.replaceChildren();
-    painel.appendChild(texto('h3', 'Central de Scripts — GitHub'));
+    painel.appendChild(texto('h3', 'Central GitHub — Diagnóstico V1.2'));
     painel.appendChild(texto('p', aviso, 'central-msg'));
+    painel.appendChild(texto('p', `${todos.length} script(s) no GitHub • ${relevantes.length} compatível(is) com esta URL • ${carregados} código(s) executado(s)`, 'central-legenda'));
+    painel.appendChild(texto('p', 'Página: ' + location.origin + location.pathname, 'central-legenda'));
     if (ultimaSincronizacao) {
       painel.appendChild(texto('p', 'Última consulta: ' + ultimaSincronizacao.toLocaleTimeString('pt-BR'), 'central-legenda'));
     }
-    if (!REPO_VALIDO) {
-      painel.appendChild(texto('p', 'Edite a constante REPOSITORIO no Tampermonkey para USUÁRIO/central-tampermonkey.'));
+    if (!todos.length) {
+      painel.appendChild(texto('p', 'Nenhum script no catálogo. Confira GitHub, Actions e a conexão.', 'central-legenda'));
     }
-    if (relevantes.length === 0 && REPO_VALIDO) {
-      painel.appendChild(texto('p', 'Nenhum script configurado para este endereço.', 'central-legenda'));
-    }
-    for (const script of relevantes) {
+    for (const script of todos) {
       const linha = document.createElement('label');
       linha.className = 'central-linha';
       const marcar = document.createElement('input');
@@ -283,41 +338,65 @@
       marcar.disabled = !script.enabled;
       marcar.addEventListener('change', () => {
         GM_setValue(PREFIXO + 'desligado:' + script.id, !marcar.checked);
-        aviso = marcar.checked ? 'Ativado. Sincronizando...' : 'Desativado. Recarregue a página para parar a execução atual.';
+        aviso = marcar.checked
+          ? 'Ativado. Sincronizando...'
+          : 'Desativado. Recarregue a página para interromper a execução atual.';
         atualizarPainel();
         if (marcar.checked) sincronizar();
       });
       const dados = document.createElement('span');
       dados.appendChild(texto('strong', script.name));
+      const correspondePagina = interessa(script);
       let situacao = 'Aguardando';
       if (!script.enabled) situacao = 'Desativado no GitHub';
       else if (!marcar.checked) situacao = 'Desativado neste navegador';
-      else if (falhas.has(script.id)) situacao = 'Erro: ' + falhas.get(script.id);
+      else if (!correspondePagina) situacao = 'Não é para esta URL';
+      else if (falhas.has(script.id)) situacao = 'ERRO ao executar: ' + falhas.get(script.id);
       else if (atualizacoesPendentes.has(script.id)) situacao = 'Nova versão: recarregue a página';
-      else if (executados.has(script.id)) situacao = 'Rodando • v' + script.version;
+      else if (executados.has(script.id)) situacao = 'Código executado • v' + script.version;
       dados.appendChild(texto('small', situacao));
+      dados.appendChild(texto('small', explicarExibicao(script), 'central-explicacao'));
       linha.append(marcar, dados);
       painel.appendChild(linha);
     }
+    const botoes = document.createElement('div');
+    botoes.className = 'central-acoes';
     const atualizar = texto('button', sincronizando ? 'Sincronizando...' : 'Sincronizar agora', 'central-atualizar');
     atualizar.disabled = sincronizando;
     atualizar.addEventListener('click', () => sincronizar());
-    painel.appendChild(atualizar);
+    const copiar = texto('button', 'Copiar diagnóstico', 'central-atualizar');
+    copiar.addEventListener('click', () => {
+      const conteudo = gerarDiagnostico();
+      if (typeof GM_setClipboard === 'function') {
+        GM_setClipboard(conteudo);
+        aviso = 'Diagnóstico copiado. Você pode colá-lo na conversa.';
+        atualizarPainel();
+      } else {
+        aviso = 'A área de transferência está indisponível.';
+        atualizarPainel();
+      }
+    });
+    botoes.append(atualizar, copiar);
+    painel.appendChild(botoes);
+    painel.appendChild(texto('p', 'O status "Código executado" não significa que o módulo criou um botão: ele pode depender de uma tela ou campo específico.', 'central-legenda'));
   }
 
   GM_addStyle(`
-    #central-github-interface { position:fixed; right:16px; bottom:16px; z-index:2147483647;
+    #central-github-interface { position:fixed; left:16px; bottom:16px; z-index:2147483647;
       font:13px/1.5 'Segoe UI',Arial,sans-serif; color:#172033; }
     #central-github-interface * {box-sizing:border-box}
-    #central-github-interface .central-github-botao {display:block;margin-left:auto; border:0;
+    #central-github-interface .central-github-botao {display:block;margin-right:auto; border:0;
       padding:10px 14px; border-radius:20px; background:#1c3872;color:white;
       font:600 13px 'Segoe UI',Arial,sans-serif;box-shadow:0 8px 25px #0003;cursor:pointer}
-    #central-github-interface .central-github-painel { width:min(355px,calc(100vw - 24px));
+    #central-github-interface .central-github-painel { width:min(420px,calc(100vw - 24px));
       max-height:70vh;overflow-y:auto;background:#fff;border-radius:14px;margin-bottom:8px;
       padding:16px;box-shadow:0 14px 40px #0004;border:1px solid #e1e7f0;}
     #central-github-interface h3 {font:700 16px 'Segoe UI',Arial,sans-serif;margin:0 0 10px}
     #central-github-interface p {margin:6px 0;word-break:break-word}
     #central-github-interface .central-msg {color:#475569}
+    #central-github-interface .central-explicacao {color:#2563eb;line-height:1.4;white-space:normal}
+    #central-github-interface .central-acoes {display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    #central-github-interface .central-acoes .central-atualizar {margin-top:8px;font-size:11px}
     #central-github-interface .central-legenda {color:#64748b;font-size:12px}
     #central-github-interface .central-linha {display:flex;gap:10px;align-items:flex-start;
       border-top:1px solid #e2e8f0;padding:10px 0;cursor:pointer}
