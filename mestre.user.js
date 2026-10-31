@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Central GitHub | Script Mestre
 // @namespace    central-github-tampermonkey
-// @version      1.3.0
-// @description  Central V1.3: diagnóstico, botão flutuante arrastável e posição salva no Tampermonkey.
+// @version      1.4.0
+// @description  Central V1.4: clique ativa posicionamento, duplo clique abre painel, e posição fica salva.
 // @match        http://*/*
 // @match        https://*/*
 // @run-at       document-idle
@@ -370,59 +370,143 @@
     const abrir = document.createElement('button');
     abrir.type = 'button';
     abrir.className = 'central-github-botao';
-    abrir.textContent = '⚙ Central 0/0'; // Define largura antes de restaurar a posição salva.
-    abrir.title = 'Clique para abrir a Central; arraste para mover e salvar a posição.';
-    abrir.setAttribute('aria-label', 'Central GitHub. Clique para abrir ou arraste para mover.');
+    abrir.textContent = '⚙ Central 0/0';
     const painel = document.createElement('section');
     painel.className = 'central-github-painel';
-    root.append(abrir, painel);
+    const dica = document.createElement('div');
+    dica.className = 'central-github-dica-mover';
+    dica.textContent = 'Modo mover: mova o cursor e clique para fixar • Esc cancela';
+    dica.style.display = 'none';
+    root.append(abrir, painel, dica);
     document.body.appendChild(root);
-    interfaceUI = { root, abrir, painel };
+    interfaceUI = { root, abrir, painel, dica };
     restaurarPosicaoBotao();
 
-    let arrasto = null;
-    let ignorarProximoClique = false;
-    abrir.addEventListener('pointerdown', e => {
-      if (e.button !== 0) return;
-      ignorarProximoClique = false;
-      const rect = abrir.getBoundingClientRect();
-      arrasto = { id: e.pointerId, inicialX: e.clientX, inicialY: e.clientY,
-        esquerda: rect.left, topo: rect.top, moveu: false };
-      try { abrir.setPointerCapture(e.pointerId); } catch (_) { /* opcional */ }
-    });
-    abrir.addEventListener('pointermove', e => {
-      if (!arrasto || e.pointerId !== arrasto.id) return;
-      const dx = e.clientX - arrasto.inicialX;
-      const dy = e.clientY - arrasto.inicialY;
-      if (!arrasto.moveu && Math.hypot(dx, dy) < 6) return;
-      arrasto.moveu = true;
-      abrir.classList.add('arrastando');
-      colocarBotao(arrasto.esquerda + dx, arrasto.topo + dy);
-      e.preventDefault();
-    });
-    function encerrarArrasto(e) {
-      if (!arrasto || e.pointerId !== arrasto.id) return;
-      if (arrasto.moveu) {
-        salvarPosicaoBotao();
-        ignorarProximoClique = true;
-      }
-      arrasto = null;
-      abrir.classList.remove('arrastando');
-      try { if (abrir.hasPointerCapture(e.pointerId)) abrir.releasePointerCapture(e.pointerId); } catch (_) { /* opcional */ }
+    // Um clique ativa o posicionamento. Enquanto ativo, o botão acompanha o cursor
+    // sem precisar manter o mouse pressionado; outro clique fixa a posição.
+    // Dois cliques abrem/fecham o painel e cancelam qualquer posicionamento ativo.
+    let modoMover = false;
+    let ancoraX = 0;
+    let ancoraY = 0;
+    let pontoInicio = null;
+    let toqueEmMovimento = false;
+    let ignorarClickAte = 0;
+
+    function indicarModo() {
+      abrir.classList.toggle('modo-mover', modoMover);
+      dica.style.display = modoMover ? 'block' : 'none';
+      abrir.setAttribute('aria-pressed', modoMover ? 'true' : 'false');
+      abrir.title = modoMover
+        ? 'Modo mover ativo. Arraste ou mova o mouse e clique para fixar. Esc cancela.'
+        : 'Um clique: mover • dois cliques: abrir ou fechar a Central';
+      abrir.setAttribute('aria-label', abrir.title);
     }
-    abrir.addEventListener('pointerup', encerrarArrasto);
-    abrir.addEventListener('pointercancel', encerrarArrasto);
+
+    function finalizarMovimento(salvar) {
+      if (!modoMover) return;
+      modoMover = false;
+      toqueEmMovimento = false;
+      pontoInicio = null;
+      if (salvar) salvarPosicaoBotao();
+      else restaurarPosicaoBotao();
+      indicarModo();
+      if (painelAberto) ajustarPosicaoPainel();
+    }
+
+    function ativarMovimento(e) {
+      const rect = abrir.getBoundingClientRect();
+      modoMover = true;
+      // Mantém o mesmo ponto de contato sob o cursor durante o movimento.
+      ancoraX = typeof e.clientX === 'number' && e.detail !== 0
+        ? Math.max(0, Math.min(rect.width, e.clientX - rect.left)) : rect.width / 2;
+      ancoraY = typeof e.clientY === 'number' && e.detail !== 0
+        ? Math.max(0, Math.min(rect.height, e.clientY - rect.top)) : rect.height / 2;
+      indicarModo();
+    }
+
     abrir.addEventListener('click', e => {
-      if (ignorarProximoClique) {
-        ignorarProximoClique = false;
+      // O arrasto por toque pode gerar um click sintético após pointerup.
+      if (Date.now() < ignorarClickAte) {
         e.preventDefault();
-        e.stopPropagation();
         return;
       }
+      e.preventDefault();
+      if (modoMover) finalizarMovimento(true);
+      else ativarMovimento(e);
+    });
+
+    abrir.addEventListener('dblclick', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Quando o segundo click de um duplo clique fixou ou iniciou o modo mover,
+      // desligamos esse modo antes de alternar a janela.
+      if (modoMover) finalizarMovimento(false);
       painelAberto = !painelAberto;
       atualizarPainel(true);
     });
-    window.addEventListener('resize', restaurarPosicaoBotao, { passive: true });
+
+    // Pointermove global em captura: continua movendo mesmo quando o mouse
+    // alcança outro elemento do APEX. Isto evita a falha do drag da versão 1.3.
+    window.addEventListener('pointermove', e => {
+      if (!modoMover || !e.isPrimary) return;
+      if (e.pointerType === 'touch' && e.buttons === 0) return;
+      if (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
+      colocarBotao(e.clientX - ancoraX, e.clientY - ancoraY);
+      if (e.pointerType === 'touch') {
+        toqueEmMovimento = true;
+        if (e.cancelable) e.preventDefault();
+      }
+    }, { capture: true, passive: false });
+
+    // Em telas sensíveis ao toque, após um toque para ativar, deslize o botão
+    // com o dedo e solte para gravar. No mouse, pode também segurar e arrastar.
+    abrir.addEventListener('pointerdown', e => {
+      if (!modoMover || e.button !== 0 || !e.isPrimary) return;
+      pontoInicio = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+      toqueEmMovimento = false;
+      try { abrir.setPointerCapture(e.pointerId); } catch (_) { /* opcional */ }
+    });
+    function encerrarPointer(e) {
+      if (!pontoInicio || e.pointerId !== pontoInicio.pointerId) return;
+      const distancia = Math.hypot(e.clientX - pontoInicio.x, e.clientY - pontoInicio.y);
+      const fixar = modoMover && (distancia > 5 || toqueEmMovimento);
+      pontoInicio = null;
+      try { if (abrir.hasPointerCapture(e.pointerId)) abrir.releasePointerCapture(e.pointerId); } catch (_) { /* opcional */ }
+      if (fixar) {
+        finalizarMovimento(true);
+        ignorarClickAte = Date.now() + 320;
+      }
+    }
+    abrir.addEventListener('pointerup', encerrarPointer);
+    abrir.addEventListener('pointercancel', e => {
+      if (pontoInicio && e.pointerId === pontoInicio.pointerId) {
+        pontoInicio = null;
+        finalizarMovimento(true);
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && modoMover) {
+        finalizarMovimento(false);
+        e.preventDefault();
+      }
+      // Teclado: Enter abre/fecha painel sem depender de duplo clique.
+      if ((e.key === 'Enter' || e.key === ' ') && document.activeElement === abrir) {
+        e.preventDefault();
+        if (modoMover) finalizarMovimento(false);
+        painelAberto = !painelAberto;
+        atualizarPainel(true);
+        ignorarClickAte = Date.now() + 320;
+      }
+    }, true);
+
+    window.addEventListener('resize', () => {
+      if (modoMover) {
+        const rect = abrir.getBoundingClientRect();
+        colocarBotao(rect.left, rect.top);
+      } else restaurarPosicaoBotao();
+    }, { passive: true });
+    indicarModo();
   }
 
   function texto(tag, conteudo, classe = '') {
@@ -447,9 +531,9 @@
     painel.style.display = painelAberto ? 'block' : 'none';
     if (!painelAberto) return;
     painel.replaceChildren();
-    painel.appendChild(texto('h3', 'Central GitHub — Diagnóstico V1.3'));
+    painel.appendChild(texto('h3', 'Central GitHub — Diagnóstico V1.4'));
     painel.appendChild(texto('p', aviso, 'central-msg'));
-    painel.appendChild(texto('p', 'Arraste o botão ⚙ Central pela tela. A posição será lembrada nas próximas visitas.', 'central-legenda'));
+    painel.appendChild(texto('p', 'Um clique ativa o modo mover; mova o mouse e clique novamente para fixar. Dois cliques abrem ou fecham a Central. A posição fica salva.', 'central-legenda'));
 
     painel.appendChild(texto('p', `${todos.length} script(s) no GitHub • ${relevantes.length} compatível(is) com esta URL • ${carregados} código(s) executado(s)`, 'central-legenda'));
     painel.appendChild(texto('p', 'Página: ' + location.origin + location.pathname, 'central-legenda'));
@@ -519,9 +603,19 @@
     #central-github-interface * {box-sizing:border-box}
     #central-github-interface .central-github-botao {display:block; border:0;
       padding:10px 14px; border-radius:20px; background:#1c3872;color:white;
-      font:600 13px 'Segoe UI',Arial,sans-serif;box-shadow:0 8px 25px #0003;cursor:grab;
+      font:600 13px 'Segoe UI',Arial,sans-serif;box-shadow:0 8px 25px #0003;cursor:pointer;
       touch-action:none; user-select:none; -webkit-user-select:none; white-space:nowrap}
-    #central-github-interface .central-github-botao.arrastando {cursor:grabbing;opacity:.92}
+    #central-github-interface .central-github-botao.modo-mover {
+      cursor:move; background:#0e7490; box-shadow:0 0 0 3px #22d3ee80,0 8px 25px #0003;
+      outline:2px dashed #67e8f9; outline-offset:2px;
+    }
+    #central-github-interface .central-github-dica-mover {
+      position:absolute; left:0; bottom:calc(100% + 8px); z-index:3;
+      width:max-content; max-width:min(290px,calc(100vw - 30px));
+      padding:7px 10px; border-radius:9px;
+      background:#0f172a; color:#fff; font:600 11px/1.4 'Segoe UI',sans-serif;
+      pointer-events:none; white-space:normal; box-shadow:0 4px 12px #0003;
+    }
     #central-github-interface .central-github-painel {position:absolute; left:0; top:auto; bottom:calc(100% + 8px);
       width:min(420px,calc(100vw - 24px)); max-height:70vh;overflow-y:auto;background:#fff;
       border-radius:14px;margin:0; padding:16px;box-shadow:0 14px 40px #0004;border:1px solid #e1e7f0;}
