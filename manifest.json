@@ -11,6 +11,17 @@
         "https://example.com/*"
       ],
       "enabled": true
+    },
+    {
+      "id": "romance-aprovacao-cadastros",
+      "name": "Romance | Aprovação de Cadastros em Lote",
+      "version": "1.0.0",
+      "file": "scripts/romance-aprovacao-cadastros.js",
+      "sha256": "cf04191b8e5b3fcf0f4230cb91bc1779886016d75d5bcb4ea8eac1f2b69bee8b",
+      "matches": [
+        "https://sistema.romancemoda.com.br/*"
+      ],
+      "enabled": true
     }
   ]
 }
