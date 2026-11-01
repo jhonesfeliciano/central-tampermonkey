@@ -84,18 +84,6 @@
         "http://sistema.romancemoda.com.br/*"
       ],
       "enabled": true
-    },
-    {
-      "id": "sistema-romance-atalhos-rapidos",
-      "name": "Sistema Romance - Atalhos Rápidos",
-      "version": "1.2.0",
-      "file": "scripts/sistema-romance-atalhos-rapidos.js",
-      "sha256": "885942d04d881bd9b2241d2820cc284c4737d28f919f745d24f764e67efabfa2",
-      "matches": [
-        "https://*/*",
-        "http://*/*"
-      ],
-      "enabled": true
     }
   ]
 }
