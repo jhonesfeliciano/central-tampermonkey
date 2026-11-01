@@ -36,6 +36,22 @@
       "enabled": true
     },
     {
+      "id": "oracle-apex-setas-fisicas-botao-flutuante-recolhivel",
+      "name": "Oracle APEX - Setas Físicas + Botão Flutuante Recolhível",
+      "version": "4.2.0",
+      "file": "scripts/oracle-apex-setas-fisicas-botao-flutuante-recolhivel.js",
+      "sha256": "e9f46572833e2a0925a10e7371ed7a7522cf8327fbb90f1621227e8fe9309fca",
+      "matches": [
+        "https://*/ords/*",
+        "http://*/ords/*",
+        "https://*/apex/*",
+        "http://*/apex/*",
+        "https://*/*",
+        "http://*/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "oracle-apex-setas-fisicas-selecao-azul-piscina",
       "name": "Oracle APEX - Setas Físicas + Seleção Azul Piscina",
       "version": "4.1.0",
