@@ -25,6 +25,17 @@
       "enabled": true
     },
     {
+      "id": "destaque-nova-guia-consulta-doc",
+      "name": "Destaque + Nova Guia - Consulta Doc.",
+      "version": "1.1",
+      "file": "scripts/destaque-nova-guia-consulta-doc.js",
+      "sha256": "ecaa16146e23a5a2475bbac888c2ba31623dc6f0af48a7e38b3c4da9a45f8e3e",
+      "matches": [
+        "https://sistema.romancemoda.com.br/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "romance-aprovacao-cadastros",
       "name": "Romance | Aprovação de Cadastros em Lote",
       "version": "1.0.0",
