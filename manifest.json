@@ -52,22 +52,6 @@
       "enabled": true
     },
     {
-      "id": "oracle-apex-setas-fisicas-selecao-azul-piscina",
-      "name": "Oracle APEX - Setas Físicas + Seleção Azul Piscina",
-      "version": "4.1.0",
-      "file": "scripts/oracle-apex-setas-fisicas-selecao-azul-piscina.js",
-      "sha256": "2fca004a1ab8ca3d9af87bd0b7219cc50026c35bc39ea58eea74e27f7574df83",
-      "matches": [
-        "https://*/ords/*",
-        "http://*/ords/*",
-        "https://*/apex/*",
-        "http://*/apex/*",
-        "https://*/*",
-        "http://*/*"
-      ],
-      "enabled": true
-    },
-    {
       "id": "romance-aprovacao-cadastros",
       "name": "Romance | Aprovação de Cadastros em Lote",
       "version": "1.0.0",
