@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         Central GitHub | Script Mestre
 // @namespace    central-github-tampermonkey
-// @version      1.7.0
-// @description  Central V1.7: botão recolhível; ao ocultar, permanece apenas uma seta para mostrar novamente.
+// @version      1.8.0
+// @description  Central V1.8: botão recolhível e atualizações automáticas do Mestre pelo GitHub.
+// @updateURL    https://raw.githubusercontent.com/jhonesfeliciano/central-tampermonkey/main/mestre.user.js
+// @downloadURL  https://raw.githubusercontent.com/jhonesfeliciano/central-tampermonkey/main/mestre.user.js
 // @match        http://*/*
 // @match        https://*/*
 // @run-at       document-idle
@@ -365,7 +367,7 @@
     barra.style.setProperty('display', recolhida ? 'none' : 'flex', 'important');
     mostrar.style.setProperty('display', recolhida ? 'block' : 'none', 'important');
     const carregados = relevantes.filter(s => executados.has(s.id)).length;
-    abrir.textContent = `⚙ Central v1.7 ${carregados}/${relevantes.length}`;
+    abrir.textContent = `⚙ Central v1.8 ${carregados}/${relevantes.length}`;
     painel.style.setProperty('display', painelAberto && !recolhida ? 'block' : 'none', 'important');
     if (!painelAberto) return;
     painel.replaceChildren();
