@@ -54,9 +54,9 @@
     {
       "id": "projeto-30-acertos-automaticos-clientes-compras",
       "name": "Projeto 30 — Acertos automáticos (Clientes + Compras)",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "file": "scripts/projeto-30-acertos-automaticos-clientes-compras.js",
-      "sha256": "a41203670c4ffc2bce68818a30d6a02f4b95466c2cd92c86a6a2ad5a8b7465f6",
+      "sha256": "8519d81eaf3cc3f903b2210e97a56f9aea46808517728c8a0af1a3355eec2efa",
       "matches": [
         "https://sistema.romancemoda.com.br/apex/*"
       ],
