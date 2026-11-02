@@ -1,19 +1,11 @@
-// ==UserScript==
-// @name         Projeto 30 — Acertos automáticos (Clientes + Compras)
-// @namespace    projeto30.acertos
-// @version      1.0.1
-// @description  Envia Distribuidor, Novas e Geral da semana selecionada para associação no Projeto 30.
-// @match        https://sistema.romancemoda.com.br/apex/*
-// @grant        GM_xmlhttpRequest
-// @grant        GM_getValue
-// @grant        GM_setValue
-// @grant        GM_registerMenuCommand
-// @grant        unsafeWindow
-// @connect      acompanhamentos-reta-final-default-rtdb.firebaseio.com
-// @run-at       document-idle
-// @noframes
-// ==/UserScript==
+// @central-id projeto-30-acertos-automaticos-clientes-compras
+// @central-name Projeto 30 — Acertos automáticos (Clientes + Compras)
+// @central-version 1.0.1
+// @central-match https://sistema.romancemoda.com.br/apex/*
+// @central-enabled true
 
+// Módulo gerado pela Central. Envie este arquivo para scripts/ no GitHub.
+// Não instale individualmente no Tampermonkey.
 (function(){
 'use strict';
 const AC_SCHEMA='projeto30-acertos-v1';
