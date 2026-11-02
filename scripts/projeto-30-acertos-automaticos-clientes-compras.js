@@ -1,11 +1,19 @@
-// @central-id projeto-30-acertos-automaticos-clientes-compras
-// @central-name Projeto 30 — Acertos automáticos (Clientes + Compras)
-// @central-version 1.0.0
-// @central-match https://sistema.romancemoda.com.br/apex/*
-// @central-enabled true
+// ==UserScript==
+// @name         Projeto 30 — Acertos automáticos (Clientes + Compras)
+// @namespace    projeto30.acertos
+// @version      1.0.1
+// @description  Envia Distribuidor, Novas e Geral da semana selecionada para associação no Projeto 30.
+// @match        https://sistema.romancemoda.com.br/apex/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_registerMenuCommand
+// @grant        unsafeWindow
+// @connect      acompanhamentos-reta-final-default-rtdb.firebaseio.com
+// @run-at       document-idle
+// @noframes
+// ==/UserScript==
 
-// Módulo gerado pela Central. Envie este arquivo para scripts/ no GitHub.
-// Não instale individualmente no Tampermonkey.
 (function(){
 'use strict';
 const AC_SCHEMA='projeto30-acertos-v1';
@@ -167,14 +175,15 @@ if(location.hostname!=='sistema.romancemoda.com.br'||document.getElementById('pF
 let acSending=false,acTimer=0,acLastPacket=null,acLastError='',acAcknowledgement=0;
 const acUi=document.createElement('span');
 acUi.id='p30-acertos-sender';
-acUi.style.cssText='display:inline-flex;align-items:center;flex-wrap:wrap;gap:7px;margin-left:8px;vertical-align:middle;font:12px Segoe UI,Arial,sans-serif';
+acUi.style.cssText='display:inline-flex;order:1000;align-items:center;flex-wrap:wrap;gap:7px;margin-left:8px;vertical-align:middle;font:12px Segoe UI,Arial,sans-serif';
 const acSendButton=document.createElement('button');
 acSendButton.type='button';acSendButton.textContent='Enviar dados';
 acSendButton.style.cssText='border:1px solid #83cbb1;background:#e6f7ef;color:#08683c;border-radius:7px;padding:8px 10px;cursor:pointer;font-weight:700';
 const acStatus=document.createElement('span');acStatus.setAttribute('role','status');acStatus.setAttribute('aria-live','polite');
 acStatus.style.cssText='max-width:340px;white-space:normal;line-height:1.35;color:#46546b';
 acUi.append(acSendButton,acStatus);
-document.getElementById('P0_IDFECHAMENTO')?.parentElement?.appendChild(acUi);
+// O APEX define a ordem visual dos campos flex; o bloco deve vir após o seletor.
+document.getElementById('P0_IDFECHAMENTO')?.after(acUi);
 function acSetStatus(text,error=false){
   if(acStatus.textContent!==text)acStatus.textContent=text;
   acStatus.style.color=error?'#b85b0a':'#08683c';
