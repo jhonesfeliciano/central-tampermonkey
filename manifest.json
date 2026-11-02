@@ -52,6 +52,17 @@
       "enabled": true
     },
     {
+      "id": "projeto-30-acertos-automaticos-clientes-compras",
+      "name": "Projeto 30 — Acertos automáticos (Clientes + Compras)",
+      "version": "1.0.0",
+      "file": "scripts/projeto-30-acertos-automaticos-clientes-compras.js",
+      "sha256": "a41203670c4ffc2bce68818a30d6a02f4b95466c2cd92c86a6a2ad5a8b7465f6",
+      "matches": [
+        "https://sistema.romancemoda.com.br/apex/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "romance-aprovacao-cadastros",
       "name": "Romance | Aprovação de Cadastros em Lote",
       "version": "1.0.0",
