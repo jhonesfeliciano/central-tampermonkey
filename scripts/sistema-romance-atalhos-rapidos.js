@@ -1,6 +1,6 @@
 // @central-id sistema-romance-atalhos-rapidos
 // @central-name Sistema Romance - Atalhos Rápidos
-// @central-version 2.0.0
+// @central-version 2.1.0
 // @central-match https://*/*
 // @central-match http://*/*
 // @central-enabled true
@@ -18,7 +18,9 @@
         storageAberto: 'lm-apex-atalhos-aberto-v1', // compatível com a versão anterior
         storageAtivos: 'lm-apex-atalhos-ativos-v2',
         storagePersonalizados: 'lm-apex-atalhos-personalizados-v2',
-        storageDescobertos: 'lm-apex-atalhos-descobertos-v2'
+        storageDescobertos: 'lm-apex-atalhos-descobertos-v2',
+        storageConjuntos: 'lm-apex-atalhos-conjuntos-v1',
+        storageConjuntoPrincipal: 'lm-apex-atalhos-conjunto-principal-v1'
     });
 
     // Primeira instalação: mantém os 11 atalhos da versão 1.2 como ativos.
@@ -838,6 +840,39 @@
         }, []);
     }
 
+    // Conjuntos independentes dos atalhos individuais. Nunca salvam o token da sessão.
+    function validarConjuntos(dados) {
+        if (!Array.isArray(dados)) return [];
+        const ids = new Set();
+        return dados.slice(0, 200).reduce((validos, grupo) => {
+            if (!grupo || typeof grupo !== 'object') return validos;
+            const id = String(grupo.id || '').trim().slice(0, 90);
+            const nome = String(grupo.nome || '').trim().slice(0, 90);
+            if (!id || !nome || ids.has(id) || !Array.isArray(grupo.paginas)) return validos;
+            const paginas = grupo.paginas.slice(0, 150).reduce((lista, entrada) => {
+                if (!entrada || typeof entrada !== 'object') return lista;
+                const pagina = somentePagina(entrada.pagina);
+                const titulo = String(entrada.nome || '').trim().slice(0, 90);
+                if (pagina && titulo) lista.push({
+                    pagina, nome: titulo, vezes: Number(entrada.vezes) === 2 ? 2 : 1
+                });
+                return lista;
+            }, []);
+            if (!paginas.length) return validos;
+            ids.add(id);
+            validos.push({id, nome, paginas});
+            return validos;
+        }, []);
+    }
+
+    function novaIdConjunto() {
+        return `conjunto-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function totalGuiasConjunto(conjunto) {
+        return conjunto.paginas.reduce((total, item) => total + item.vezes, 0);
+    }
+
     function registrarMenuAtual() {
         const nav = document.querySelector('#t_TreeNav');
         if (!nav) return [];
@@ -1023,6 +1058,44 @@
             .vazio { padding: 19px 11px; text-align: center; border: 1px dashed #cbd5e1;
                 border-radius: 11px; color: #64748b; font-size: 12px; line-height: 1.5; }
             .gerenciar-rodape { margin-top: 13px; color: #64748b; font-size: 10px; line-height: 1.5; }
+            .barra-lote {
+                display: flex; align-items: center; justify-content: space-between; gap: 8px;
+                margin-top: 11px; padding: 9px; border-radius: 11px; border: 1px solid #bfdbfe;
+                background: linear-gradient(115deg,#eff6ff,#f8fbff);
+            }
+            .barra-lote .texto-lote { min-width: 0; flex: 1; }
+            .rotulo-lote { display: block; font-size: 11.5px; color: #1e3a8a; font-weight: 800; }
+            .sub-lote { display: block; font-size: 10px; color: #64748b; margin-top: 3px; overflow-wrap: anywhere; }
+            .lote-acoes { display: flex; gap: 5px; align-items: center; }
+            .lote-acoes .btn { min-height: 32px; }
+            .aviso-lote { margin: 7px 1px 0; font-size: 11px; line-height: 1.4; color: #166534; }
+            .aviso-lote.erro { color: #b91c1c; }
+            .grupo-lote { display: grid; gap: 9px; padding: 12px; border: 1px solid #dbe4f0;
+                background: #fff; border-radius: 12px; box-shadow: 0 2px 9px rgba(30,41,59,.035); }
+            .grupo-titulo { font-size: 13px; color: #0f172a; font-weight: 800; margin: 0; overflow-wrap: anywhere; }
+            .grupo-sub { font-size: 11px; color: #64748b; line-height: 1.5; overflow-wrap: anywhere; }
+            .grupo-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+            .grupo-botoes { display: flex; gap: 6px; flex-wrap: wrap; }
+            .btn-vermelho { color: #be123c; border-color: #fecdd3; background: #fff7f8; }
+            .btn-vermelho:hover { background: #ffe4e6; border-color: #fda4af; }
+            .btn-preferido { color: #854d0e; border-color: #fde68a; background: #fffbeb; }
+            .btn-preferido:hover { background: #fef3c7; }
+            .botao-grande { flex: 1 1 100%; }
+            .form-lote { display: grid; gap: 10px; }
+            .campo-label { display: grid; gap: 5px; font-size: 11px; font-weight: 750; color: #475569; min-width: 0; }
+            .secao-lote { display: grid; gap: 8px; padding: 11px; border: 1px solid #e0e7ff; border-radius: 11px; background: #f8faff; }
+            .secao-titulo { margin: 0; font-size: 12px; font-weight: 800; color: #0f172a; }
+            .editor-linha { display: grid; gap: 8px; }
+            .editor-duas { display: grid; grid-template-columns: 1fr 100px; gap: 8px; }
+            .editor-tres { display: grid; grid-template-columns: 1fr 68px; gap: 8px; }
+            .item-lote { display: grid; gap: 8px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: white; }
+            .item-lote-topo { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+            .numero-lote { font-size: 10px; color: #64748b; font-weight: 800; }
+            .item-lote .campo { min-height: 31px; padding: 6px 8px; }
+            .legenda-lote { font-size: 10px; color: #64748b; line-height: 1.4; }
+            .lote-rodape { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 5px; }
+            .lote-rodape .btn-azul { flex: 1; }
+            .selecionar-lote { width: 100%; }
             @media (max-width: 520px) {
                 .dock { width: min(390px, 100vw); bottom: 62px; max-height: calc(100vh - 72px); }
                 .painel { max-height: calc(100vh - 78px); }
@@ -1080,10 +1153,84 @@
         let busca = '';
         let filtro = 'todos';
         let area = 'todas';
+        let conjuntos = validarConjuntos(lerJSON(CONFIG.storageConjuntos, []));
+        let conjuntoPrincipal = (() => {
+            try { return window.localStorage.getItem(CONFIG.storageConjuntoPrincipal) || ''; }
+            catch { return ''; }
+        })();
+        let rascunhoConjunto = null;
+        if (!conjuntos.some(grupo => grupo.id === conjuntoPrincipal)) {
+            conjuntoPrincipal = conjuntos[0]?.id || '';
+        }
+
 
         function atualizarCatalogo() { catalogo = montarCatalogo(personalizados, descobertos); }
         function salvarAtivos() { escreverJSON(CONFIG.storageAtivos, Array.from(ativos)); }
         function salvarPersonalizados() { escreverJSON(CONFIG.storagePersonalizados, personalizados); }
+        function salvarConjuntos() {
+            return escreverJSON(CONFIG.storageConjuntos, conjuntos);
+        }
+
+        function salvarPrincipal(id) {
+            conjuntoPrincipal = id;
+            try { window.localStorage.setItem(CONFIG.storageConjuntoPrincipal, id); return true; }
+            catch { return false; }
+        }
+
+        // As chamadas são todas síncronas e acontecem dentro do clique do usuário:
+        // temporizadores e awaits fariam o navegador bloquear mais abas.
+        function abrirConjunto(conjunto, mensagem) {
+            let enderecos;
+            try {
+                enderecos = conjunto.paginas.flatMap(item =>
+                    Array.from({length: item.vezes}, () =>
+                        new URL(criarUrlDestino(item.pagina), window.location.href).href));
+            } catch (erro) {
+                mensagem(erro.message, true);
+                return;
+            }
+            let abertas = 0;
+            let bloqueadas = 0;
+            for (const endereco of enderecos) {
+                let abriu = false;
+                // Usa a API do Tampermonkey quando o Script Mestre a disponibiliza.
+                if (typeof GM_openInTab === 'function') {
+                    try {
+                        const aba = GM_openInTab(endereco, {active: false, insert: true});
+                        abriu = Boolean(aba);
+                    } catch { /* Recorre à abertura normal do navegador. */ }
+                }
+                if (!abriu) {
+                    try {
+                        const aba = window.open(endereco, '_blank');
+                        if (aba) {
+                            try { aba.opener = null; } catch { /* Mesmo domínio, mas continue. */ }
+                            abriu = true;
+                        }
+                    } catch { /* Abertura bloqueada. */ }
+                }
+                if (abriu) abertas++;
+                else { bloqueadas = enderecos.length - abertas; break; }
+            }
+            if (bloqueadas) {
+                mensagem(`Foram abertas ${abertas} de ${enderecos.length} guias. Libere pop-ups e redirecionamentos deste site no navegador e tente novamente. Ao repetir, as guias já abertas serão abertas de novo.`, true);
+            } else {
+                mensagem(`${enderecos.length} guia${enderecos.length !== 1 ? 's' : ''} solicitada${enderecos.length !== 1 ? 's' : ''} do conjunto “${conjunto.nome}”.`, false);
+            }
+        }
+
+        function criarAvisoLote() {
+            const aviso = el('p', 'aviso-lote oculto');
+            return {
+                elemento: aviso,
+                mostrar(texto, erro = false) {
+                    aviso.textContent = texto;
+                    aviso.classList.remove('oculto');
+                    aviso.classList.toggle('erro', erro);
+                }
+            };
+        }
+
         function atualizaMenu() {
             const lidos = registrarMenuAtual();
             if (!lidos.length) return;
@@ -1159,6 +1306,27 @@
             configurar.addEventListener('click', () => mudarTela('gerenciar'));
             barra.appendChild(configurar);
             topo.append(cabecalho, barra);
+
+            const principal = conjuntos.find(g => g.id === conjuntoPrincipal) || null;
+            const barraLote = el('div', 'barra-lote');
+            const blocoInfoLote = el('div', 'texto-lote');
+            blocoInfoLote.append(el('span', 'rotulo-lote', 'Abertura em lote'),
+                el('span', 'sub-lote', principal
+                    ? `${principal.nome} • ${totalGuiasConjunto(principal)} guias configuradas`
+                    : 'Configure páginas para abrir com um clique'));
+            const acoesLote = el('div', 'lote-acoes');
+            const abrirLote = botao(principal ? '▶ Abrir' : '＋ Criar', 'btn btn-azul',
+                principal ? `Abrir todas as páginas de ${principal.nome}` : 'Criar primeiro conjunto');
+            const gerenciarLotes = botao('⚙', 'btn btn-icone', 'Criar, editar e organizar conjuntos');
+            const avisoLote = criarAvisoLote();
+            abrirLote.addEventListener('click', () => {
+                if (principal) abrirConjunto(principal, avisoLote.mostrar);
+                else mudarTela('conjuntos');
+            });
+            gerenciarLotes.addEventListener('click', () => mudarTela('conjuntos'));
+            acoesLote.append(abrirLote, gerenciarLotes);
+            barraLote.append(blocoInfoLote, acoesLote);
+            topo.append(barraLote, avisoLote.elemento);
 
             if (!selecionados.length) {
                 conteudo.appendChild(el('div', 'vazio', 'Nenhum atalho ativo. Clique em “Adicionar / organizar” para escolher suas páginas.'));
@@ -1337,8 +1505,249 @@
             rodape.textContent = 'Selecione somente os caminhos que deseja no painel principal.';
         }
 
+        function criarCabecalhoLote(titulo, subtitulo, voltarPara) {
+            const cabecalho = el('div', 'cabecalho');
+            const tituloArea = el('div');
+            tituloArea.append(el('h2', 'titulo', titulo), el('p', 'subtitulo', subtitulo));
+            const acoes = el('div', 'acoes');
+            const voltar = botao('←', 'btn btn-icone', 'Voltar');
+            voltar.addEventListener('click', () => mudarTela(voltarPara));
+            const fechar = botao('×', 'btn btn-icone', 'Ocultar painel');
+            fechar.addEventListener('click', () => atualizarPainel(false));
+            acoes.append(voltar, fechar);
+            cabecalho.append(tituloArea, acoes);
+            topo.appendChild(cabecalho);
+        }
+
+        function editarConjunto(id = '') {
+            const existente = conjuntos.find(g => g.id === id);
+            rascunhoConjunto = existente
+                ? {id: existente.id, nome: existente.nome, paginas: existente.paginas.map(x => ({...x}))}
+                : {id: novaIdConjunto(), nome: '', paginas: []};
+            mudarTela('editor-lote');
+        }
+
+        function renderConjuntos() {
+            topo.replaceChildren(); conteudo.replaceChildren();
+            criarCabecalhoLote('Abrir várias páginas', 'Conjuntos salvos • Cada página em sua própria guia', 'ativos');
+            const barra = el('div', 'barra-acoes');
+            barra.append(el('span', 'contagem', `${conjuntos.length} conjunto${conjuntos.length !== 1 ? 's' : ''} salvo${conjuntos.length !== 1 ? 's' : ''}`));
+            const adicionar = botao('＋ Novo conjunto', 'btn btn-azul');
+            adicionar.addEventListener('click', () => editarConjunto());
+            barra.append(adicionar);
+            topo.appendChild(barra);
+            const aviso = criarAvisoLote();
+            topo.appendChild(aviso.elemento);
+            if (!conjuntos.length) {
+                conteudo.appendChild(el('div', 'vazio', 'Nenhum conjunto criado. Escolha um nome e as páginas para abrir todas em um clique.'));
+            }
+            const lista = el('div', 'lista');
+            const ordenados = [...conjuntos].sort((a, b) =>
+                a.nome.localeCompare(b.nome, 'pt-BR', {sensitivity: 'base', numeric: true}));
+            for (const grupo of ordenados) {
+                const item = el('section', 'grupo-lote');
+                const superior = el('div', 'grupo-topo');
+                const titulo = el('h3', 'grupo-titulo', grupo.nome);
+                const marcador = el('span', 'pagina-chip',
+                    grupo.id === conjuntoPrincipal ? '★ Principal' : `${totalGuiasConjunto(grupo)} guias`);
+                superior.append(titulo, marcador);
+                const resumo = el('div', 'grupo-sub',
+                    grupo.paginas.map(p => `${p.nome} (P. ${p.pagina}${p.vezes === 2 ? ', 2x' : ''})`).join(' • '));
+                const botoes = el('div', 'grupo-botoes');
+                const abrir = botao(`▶ Abrir ${totalGuiasConjunto(grupo)} guias`, 'btn btn-azul botao-grande',
+                    `Abrir todas as páginas do conjunto ${grupo.nome}`);
+                abrir.addEventListener('click', () => abrirConjunto(grupo, aviso.mostrar));
+                const editar = botao('✎ Editar', 'btn');
+                editar.addEventListener('click', () => editarConjunto(grupo.id));
+                const preferir = botao(grupo.id === conjuntoPrincipal ? '★ Principal' : '☆ Tornar principal',
+                    'btn btn-preferido', 'Usar este conjunto no botão principal dos atalhos rápidos');
+                preferir.disabled = grupo.id === conjuntoPrincipal;
+                preferir.addEventListener('click', () => {
+                    if (!salvarPrincipal(grupo.id)) {
+                        aviso.mostrar('Não foi possível guardar o conjunto principal neste navegador.', true);
+                        return;
+                    }
+                    renderConjuntos();
+                });
+                const excluir = botao('Excluir', 'btn btn-vermelho');
+                excluir.addEventListener('click', () => {
+                    if (!window.confirm(`Excluir o conjunto “${grupo.nome}”? Os atalhos individuais continuarão como estão.`)) return;
+                    const anterior = conjuntos;
+                    conjuntos = conjuntos.filter(x => x.id !== grupo.id);
+                    if (!salvarConjuntos()) {
+                        conjuntos = anterior;
+                        aviso.mostrar('Não foi possível excluir: armazenamento indisponível.', true);
+                        return;
+                    }
+                    if (conjuntoPrincipal === grupo.id) salvarPrincipal(conjuntos[0]?.id || '');
+                    renderConjuntos();
+                });
+                botoes.append(abrir, editar, preferir, excluir);
+                item.append(superior, resumo, botoes);
+                lista.appendChild(item);
+            }
+            conteudo.appendChild(lista);
+            rodape.textContent = 'Os conjuntos ficam salvos neste navegador. Links usam a sessão atual do Oracle APEX.';
+        }
+
+        function renderEditorLote() {
+            if (!rascunhoConjunto) { mudarTela('conjuntos'); return; }
+            topo.replaceChildren(); conteudo.replaceChildren();
+            const existente = conjuntos.some(g => g.id === rascunhoConjunto.id);
+            criarCabecalhoLote(existente ? 'Editar conjunto' : 'Novo conjunto',
+                'Personalize as páginas, seus nomes e a quantidade de guias', 'conjuntos');
+            const aviso = criarAvisoLote();
+            const formulario = el('div', 'form-lote');
+            const campoGrupo = el('label', 'campo-label', 'Nome deste conjunto');
+            const nomeGrupo = el('input', 'campo');
+            nomeGrupo.type = 'text'; nomeGrupo.maxLength = 90;
+            nomeGrupo.placeholder = 'Ex.: Início do expediente';
+            nomeGrupo.value = rascunhoConjunto.nome;
+            nomeGrupo.addEventListener('input', () => { rascunhoConjunto.nome = nomeGrupo.value; });
+            campoGrupo.appendChild(nomeGrupo);
+            formulario.append(campoGrupo);
+
+            const secaoAdicionar = el('section', 'secao-lote');
+            secaoAdicionar.appendChild(el('h3', 'secao-titulo', 'Adicionar uma página'));
+            const listaCatalogo = el('label', 'campo-label', 'Escolher do catálogo (opcional)');
+            const escolha = el('select', 'seletor selecionar-lote');
+            const escolher = el('option', '', 'Selecione uma página ou preencha abaixo');
+            escolher.value = ''; escolha.appendChild(escolher);
+            for (const paginaCatalogo of catalogo) {
+                const op = el('option', '', `${paginaCatalogo.nome} — P. ${paginaCatalogo.pagina}`);
+                op.value = paginaCatalogo.pagina;
+                escolha.appendChild(op);
+            }
+            listaCatalogo.appendChild(escolha);
+            const nomePaginaLabel = el('label', 'campo-label', 'Nome da página');
+            const nomePagina = el('input', 'campo');
+            nomePagina.type = 'text'; nomePagina.maxLength = 90;
+            nomePagina.placeholder = 'Ex.: Acertos Pendentes';
+            nomePaginaLabel.appendChild(nomePagina);
+            const linhaEntrada = el('div', 'editor-duas');
+            const paginaLabel = el('label', 'campo-label', 'Nº da página ou link APEX');
+            const numeroPagina = el('input', 'campo');
+            numeroPagina.type = 'text'; numeroPagina.placeholder = 'Ex.: 183';
+            paginaLabel.appendChild(numeroPagina);
+            const vezesLabel = el('label', 'campo-label', 'Abrir vezes');
+            const vezes = el('select', 'seletor');
+            for (const qtd of [1, 2]) {
+                const op = el('option', '', `${qtd} ${qtd === 1 ? 'guia' : 'guias'}`);
+                op.value = String(qtd); vezes.appendChild(op);
+            }
+            vezesLabel.appendChild(vezes);
+            linhaEntrada.append(paginaLabel, vezesLabel);
+            escolha.addEventListener('change', () => {
+                const achado = catalogo.find(item => item.pagina === escolha.value);
+                if (achado) {
+                    nomePagina.value = achado.nome;
+                    numeroPagina.value = achado.pagina;
+                }
+            });
+            const adicionar = botao('＋ Incluir página', 'btn btn-azul');
+            const avisoEntrada = criarAvisoLote();
+            adicionar.addEventListener('click', () => {
+                const num = interpretarNumeroDaPagina(numeroPagina.value);
+                const nome = nomePagina.value.trim();
+                if (!num || !nome) {
+                    avisoEntrada.mostrar('Informe o nome e um número/link válido do aplicativo 2001.', true);
+                    return;
+                }
+                if (rascunhoConjunto.paginas.length >= 150) {
+                    avisoEntrada.mostrar('Limite de 150 linhas por conjunto.', true); return;
+                }
+                rascunhoConjunto.paginas.push({pagina: num, nome: nome.slice(0, 90), vezes: Number(vezes.value) === 2 ? 2 : 1});
+                escolha.value = ''; nomePagina.value = ''; numeroPagina.value = ''; vezes.value = '1';
+                avisoEntrada.elemento.classList.add('oculto');
+                desenharPaginas();
+            });
+            secaoAdicionar.append(listaCatalogo, nomePaginaLabel, linhaEntrada, adicionar, avisoEntrada.elemento);
+            formulario.append(secaoAdicionar);
+
+            const tituloItens = el('h3', 'secao-titulo', 'Páginas incluídas');
+            const contagem = el('span', 'contagem');
+            const listaItens = el('div', 'lista');
+            formulario.append(tituloItens, contagem, listaItens);
+
+            function desenharPaginas() {
+                listaItens.replaceChildren();
+                const qtd = rascunhoConjunto.paginas.reduce((n, p) => n + p.vezes, 0);
+                contagem.textContent = `${rascunhoConjunto.paginas.length} página(s) • ${qtd} guia(s) no total`;
+                if (!rascunhoConjunto.paginas.length) {
+                    listaItens.appendChild(el('div', 'vazio', 'Adicione pelo menos uma página.'));
+                    return;
+                }
+                rascunhoConjunto.paginas.forEach((p, indice) => {
+                    const item = el('div', 'item-lote');
+                    const topoItem = el('div', 'item-lote-topo');
+                    topoItem.append(el('span', 'numero-lote', `Página ${indice + 1}`));
+                    const remover = botao('× Remover', 'btn btn-vermelho');
+                    remover.addEventListener('click', () => {
+                        rascunhoConjunto.paginas.splice(indice, 1); desenharPaginas();
+                    });
+                    topoItem.appendChild(remover);
+                    const nomeLabel = el('label', 'campo-label', 'Nome exibido');
+                    const nome = el('input', 'campo'); nome.type = 'text'; nome.maxLength = 90; nome.value = p.nome;
+                    nome.addEventListener('input', () => { p.nome = nome.value; });
+                    nomeLabel.appendChild(nome);
+                    const dupla = el('div', 'editor-duas');
+                    const numeroLabel = el('label', 'campo-label', 'Página APEX');
+                    const numero = el('input', 'campo'); numero.type = 'text'; numero.value = p.pagina;
+                    numero.addEventListener('change', () => {
+                        const corrigida = interpretarNumeroDaPagina(numero.value);
+                        if (corrigida) { p.pagina = corrigida; numero.value = corrigida; }
+                        else { numero.value = p.pagina; aviso.mostrar('Número/link inválido. A página anterior foi mantida.', true); }
+                    });
+                    numeroLabel.appendChild(numero);
+                    const vezesLabel = el('label', 'campo-label', 'Abrir vezes');
+                    const vezesItem = el('select', 'seletor');
+                    for (const n of [1,2]) {
+                        const opt = el('option', '', `${n} ${n === 1 ? 'guia' : 'guias'}`);
+                        opt.value = String(n); vezesItem.appendChild(opt);
+                    }
+                    vezesItem.value = String(p.vezes);
+                    vezesItem.addEventListener('change', () => { p.vezes = Number(vezesItem.value) === 2 ? 2 : 1; desenharPaginas(); });
+                    vezesLabel.appendChild(vezesItem);
+                    dupla.append(numeroLabel, vezesLabel);
+                    item.append(topoItem, nomeLabel, dupla);
+                    listaItens.appendChild(item);
+                });
+            }
+            desenharPaginas();
+            const rodapeEditor = el('div', 'lote-rodape');
+            const salvar = botao('✓ Salvar conjunto', 'btn btn-azul');
+            salvar.addEventListener('click', () => {
+                const nome = rascunhoConjunto.nome.trim().slice(0, 90);
+                if (!nome) { aviso.mostrar('Dê um nome ao conjunto antes de salvar.', true); return; }
+                if (!rascunhoConjunto.paginas.length) { aviso.mostrar('Adicione pelo menos uma página.', true); return; }
+                if (rascunhoConjunto.paginas.some(p => !somentePagina(p.pagina) || !p.nome.trim())) {
+                    aviso.mostrar('Todas as páginas precisam ter nome e número válido.', true); return;
+                }
+                const novo = {id: rascunhoConjunto.id, nome,
+                    paginas: rascunhoConjunto.paginas.map(p => ({...p, nome: p.nome.trim().slice(0, 90)}))};
+                const anterior = conjuntos;
+                conjuntos = conjuntos.filter(g => g.id !== novo.id).concat(novo);
+                if (!salvarConjuntos()) {
+                    conjuntos = anterior;
+                    aviso.mostrar('Falha ao salvar no navegador. Verifique se o armazenamento local está permitido.', true);
+                    return;
+                }
+                if (!conjuntoPrincipal) salvarPrincipal(novo.id);
+                rascunhoConjunto = null;
+                mudarTela('conjuntos');
+            });
+            const cancelar = botao('Cancelar', 'btn');
+            cancelar.addEventListener('click', () => { rascunhoConjunto = null; mudarTela('conjuntos'); });
+            rodapeEditor.append(salvar, cancelar);
+            formulario.append(rodapeEditor, aviso.elemento);
+            conteudo.appendChild(formulario);
+            rodape.textContent = 'Use 1 ou 2 guias para cada página. A sessão APEX será obtida ao clicar em Abrir.';
+        }
+
         function renderizar() {
             if (tela === 'gerenciar') renderGerenciar();
+            else if (tela === 'conjuntos') renderConjuntos();
+            else if (tela === 'editor-lote') renderEditorLote();
             else renderAtivos();
         }
 
