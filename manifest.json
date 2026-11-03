@@ -96,6 +96,18 @@
       "enabled": true
     },
     {
+      "id": "romance-selecionar-checkbox-linha",
+      "name": "Romance - Selecionar Checkbox clicando na linha",
+      "version": "1.1.0",
+      "file": "scripts/romance-selecionar-checkbox-linha.js",
+      "sha256": "c2802b691843eb9dca8db9cfc5750957ded2fb84824d9e117ea76ff9c4681ddf",
+      "matches": [
+        "https://sistema.romancemoda.com.br/*",
+        "http://sistema.romancemoda.com.br/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "romance-sistema-lapis-verde-abrir-nova-guia",
       "name": "Romance Sistema - Lápis Verde Abrir Nova Guia",
       "version": "1.1.0",
