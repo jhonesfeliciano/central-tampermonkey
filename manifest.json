@@ -47,6 +47,29 @@
       "enabled": true
     },
     {
+      "id": "nexus-compra-ticket-loader-matriz",
+      "name": "NEXUS Compra & Ticket Loader - MATRIZ",
+      "version": "1.0.0",
+      "file": "scripts/nexus-compra-ticket-loader-matriz.js",
+      "sha256": "d68d2975fed499c7ce69bf5683c0a77ba61e31a8d27c347f1b6cbbb7e3183cb6",
+      "matches": [
+        "https://sistema.romancemoda.com.br/apex/*"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "nexus-loader-dinamico-matriz",
+      "name": "NEXUS Loader Dinâmico - MATRIZ",
+      "version": "1.0.0",
+      "file": "scripts/nexus-loader-dinamico-matriz.js",
+      "sha256": "f9bf93b42c465088b5f4677dd9cfa1987ba98a1f02381c1499afb0c41872c9c9",
+      "matches": [
+        "https://sistema.romancemoda.com.br/*",
+        "http://sistema.romancemoda.com.br/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "oracle-apex-setas-fisicas-botao-flutuante-recolhivel",
       "name": "Oracle APEX - Setas Físicas + Botão Flutuante Recolhível",
       "version": "4.2.0",
