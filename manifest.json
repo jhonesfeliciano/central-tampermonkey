@@ -122,9 +122,9 @@
     {
       "id": "sistema-romance-atalhos-rapidos",
       "name": "Sistema Romance - Atalhos Rápidos",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "file": "scripts/sistema-romance-atalhos-rapidos.js",
-      "sha256": "b2ecdc0fc54e49c55ed3ec07e1e22eddca999f481931916d69cf31dfac4f2c93",
+      "sha256": "37b96dd4f20965ddb0d22245a235797106376a792498dc9b3ac7b2e8013c41e7",
       "matches": [
         "https://*/*",
         "http://*/*"
