@@ -2,6 +2,17 @@
   "schema": 1,
   "scripts": [
     {
+      "id": "auto-calc-enviar-acertos-pendentes",
+      "name": "Auto Calc - Enviar Acertos Pendentes",
+      "version": "3.9.0",
+      "file": "scripts/auto-calc-enviar-acertos-pendentes.js",
+      "sha256": "28b635908919dc0c1555dd83a74b9821ec9907a0dfde597d90960a6bd72ce6ac",
+      "matches": [
+        "https://sistema.romancemoda.com.br/apex/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "clonar-botao-filtrar-apex-topo",
       "name": "Clonar Botão Filtrar - APEX (Topo)",
       "version": "1.1",
