@@ -119,6 +119,17 @@
       "enabled": true
     },
     {
+      "id": "romance-copiar-cliente-codigo-antecipacao",
+      "name": "Romance | Copiar Cliente e Código + Automatizar Antecipação",
+      "version": "3.5.0",
+      "file": "scripts/romance-copiar-cliente-codigo-antecipacao.js",
+      "sha256": "7dd091038b53361d236bf2fc3be153ce502e1f84505d8c37bc97085e423d0a36",
+      "matches": [
+        "https://sistema.romancemoda.com.br/apex/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "romance-ir-notas-cpf-automatico",
       "name": "Romance | Ir para Notas + CPF Automático",
       "version": "2.3.0",
