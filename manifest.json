@@ -121,9 +121,9 @@
     {
       "id": "romance-ir-notas-cpf-automatico",
       "name": "Romance | Ir para Notas + CPF Automático",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "file": "scripts/romance-ir-notas-cpf-automatico.js",
-      "sha256": "76b47457404c60100e8f8eff3e278309dc36d85747b16af872a656952272c815",
+      "sha256": "6e75a85972b908e13712674ad44d240aa92c77da09f38e9f19ee87c87b9b93b0",
       "matches": [
         "https://sistema.romancemoda.com.br/apex/*"
       ],
