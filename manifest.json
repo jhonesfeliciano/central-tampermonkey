@@ -119,6 +119,17 @@
       "enabled": true
     },
     {
+      "id": "romance-ir-notas-cpf-automatico",
+      "name": "Romance | Ir para Notas + CPF Automático",
+      "version": "2.2.0",
+      "file": "scripts/romance-ir-notas-cpf-automatico.js",
+      "sha256": "76b47457404c60100e8f8eff3e278309dc36d85747b16af872a656952272c815",
+      "matches": [
+        "https://sistema.romancemoda.com.br/apex/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "romance-selecionar-checkbox-linha",
       "name": "Romance - Selecionar Checkbox clicando na linha",
       "version": "1.1.0",
