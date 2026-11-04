@@ -1,10 +1,11 @@
 // @central-id romance-ir-notas-cpf-automatico
 // @central-name Romance | Ir para Notas + CPF Automático
-// @central-version 2.2.0
+// @central-version 2.3.0
 // @central-match https://sistema.romancemoda.com.br/apex/*
 // @central-enabled true
 
 // Módulo preparado para Central GitHub (Script Mestre V1.8).
+// V2.3: Pesquisar + Ir para Notas Romance + status em uma só linha.
 // Executa apenas na página 280; o interruptor fica ao lado de "Consulta Documento".
 // ON: mantém a automação original de colagem, validação, pesquisa e abertura.
 // OFF: deixa apenas o interruptor e a página normal do Oracle APEX.
@@ -26,6 +27,7 @@
         botaoAuto: 'tm-notas-auto-toggle', // legado: será removido, não recriado
         botaoCabecalho: 'tm-notas-auto-cabecalho',
         estiloCabecalho: 'tm-notas-auto-cabecalho-css',
+        estiloLinha: 'tm-notas-auto-linha-css',
         cabecalhoRegiao: 'R28041201908699681',
         status: 'tm-notas-auto-status',
         pendencia: 'tm-romance-notas-pesquisa-pendente-v2',
@@ -92,6 +94,7 @@
         const el = $id(CFG.status);
         if (!el) return;
         el.textContent = mensagem;
+        el.title = mensagem; // Texto completo ao passar o mouse quando houver pouco espaço.
         el.style.color = cor;
     }
 
@@ -273,6 +276,66 @@
         atualizarInterruptor();
     }
 
+    // Alinha o botão nativo Pesquisar, o atalho de rolagem e o texto de status.
+    // Não recria nem substitui o botão original do APEX: mantém seus eventos nativos.
+    function alinharAcoesConsulta(pesquisar) {
+        const coluna = pesquisar?.parentElement;
+        if (!coluna) return;
+        if (!$id(CFG.estiloLinha)) {
+            const estilo = document.createElement('style');
+            estilo.id = CFG.estiloLinha;
+            estilo.textContent = `
+                #${CFG.cabecalhoRegiao} .tm-notas-acoes-linha {
+                    display: flex !important;
+                    flex-flow: row nowrap !important;
+                    align-items: center !important;
+                    justify-content: flex-start !important;
+                    column-gap: 10px !important;
+                    width: 100% !important;
+                    min-width: 0 !important;
+                }
+                #${CFG.cabecalhoRegiao} .tm-notas-acoes-linha > #${CFG.pesquisar},
+                #${CFG.cabecalhoRegiao} .tm-notas-acoes-linha > #${CFG.botaoRolar} {
+                    flex: 0 0 auto !important;
+                    margin: 0 !important;
+                    white-space: nowrap !important;
+                    align-self: center !important;
+                }
+                #${CFG.cabecalhoRegiao} .tm-notas-acoes-linha > #${CFG.status} {
+                    flex: 1 1 auto !important;
+                    min-width: 0 !important;
+                    margin: 0 !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    white-space: nowrap !important;
+                    align-self: center !important;
+                }
+                @media(max-width:600px) {
+                    #${CFG.cabecalhoRegiao} .tm-notas-acoes-linha { column-gap: 6px !important; }
+                    #${CFG.cabecalhoRegiao} .tm-notas-acoes-linha > #${CFG.botaoRolar} {
+                        padding: 8px 9px !important;
+                        font-size: 11px !important;
+                    }
+                    #${CFG.cabecalhoRegiao} .tm-notas-acoes-linha > #${CFG.status} {
+                        font-size: 10px !important;
+                    }
+                }
+            `;
+            (document.head || document.documentElement).appendChild(estilo);
+        }
+        coluna.classList.add('tm-notas-acoes-linha');
+        // Reposiciona apenas os elementos criados por este módulo.
+        const rolar = $id(CFG.botaoRolar);
+        if (rolar && rolar.previousElementSibling !== pesquisar) {
+            pesquisar.insertAdjacentElement('afterend', rolar);
+        }
+        const status = $id(CFG.status);
+        if (status && rolar && status.previousElementSibling !== rolar) {
+            rolar.insertAdjacentElement('afterend', status);
+        }
+        if (status) status.title = status.textContent || '';
+    }
+
     function criarBotoes() {
         if (!paginaCerta() || !estaHabilitado()) return;
         const pesquisar = encontrarPesquisar();
@@ -285,8 +348,9 @@
             botao.textContent = '↓ Ir para Notas Romance';
             botao.className = 't-Button';
             Object.assign(botao.style, {
-                display: 'block',
-                marginTop: '10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                marginTop: '0',
                 padding: '9px 14px',
                 background: '#2563eb',
                 color: '#fff',
@@ -308,17 +372,18 @@
         }
 
         // O interruptor de automação foi transferido para a faixa de título.
-        // O botão auxiliar de rolagem e o status só existem quando está ON.
+        // O botão auxiliar de rolagem e o status só existem quando está ON; ficam na mesma linha do Pesquisar.
         $id(CFG.botaoAuto)?.remove(); // remove controle antigo, caso exista
         if (!$id(CFG.status) && $id(CFG.botaoRolar)) {
-            const linha = document.createElement('div');
+            const linha = document.createElement('span');
             linha.id = CFG.status;
             Object.assign(linha.style, {
-                marginTop: '5px', maxWidth: '420px', fontSize: '12px',
-                lineHeight: '1.4', color: '#475569', overflowWrap: 'anywhere'
+                display: 'inline-block', fontSize: '12px',
+                lineHeight: '1.4', color: '#475569'
             });
             $id(CFG.botaoRolar).insertAdjacentElement('afterend', linha);
         }
+        alinharAcoesConsulta(pesquisar);
 
     }
 
