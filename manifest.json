@@ -130,6 +130,17 @@
       "enabled": true
     },
     {
+      "id": "romance-enviar-fechamento-crescimento-notas",
+      "name": "Romance | Enviar para Fechamento - Crescimento de Notas",
+      "version": "1.0.0",
+      "file": "scripts/romance-enviar-fechamento-crescimento-notas.js",
+      "sha256": "4b930da630d46f2ce59fc480988eaed1558073a8846f11f8b3987e79036d3cd9",
+      "matches": [
+        "https://sistema.romancemoda.com.br/apex/*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "romance-ir-notas-cpf-automatico",
       "name": "Romance | Ir para Notas + CPF Automático",
       "version": "2.3.0",
