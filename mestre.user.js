@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Central GitHub | Script Mestre
 // @namespace    central-github-tampermonkey
-// @version      1.8.0
-// @description  Central V1.8: botão recolhível e atualizações automáticas do Mestre pelo GitHub.
+// @version      2.0.0
+// @description  Central V2.0: carregamento paralelo dos módulos compatíveis, com diagnóstico individual.
 // @updateURL    https://raw.githubusercontent.com/jhonesfeliciano/central-tampermonkey/main/mestre.user.js
 // @downloadURL  https://raw.githubusercontent.com/jhonesfeliciano/central-tampermonkey/main/mestre.user.js
 // @match        http://*/*
@@ -40,6 +40,7 @@
   const executados = new Map();
   const atualizacoesPendentes = new Set();
   const falhas = new Map();
+  const carregando = new Set();
   let catalogo = null;
   let sincronizando = false;
   let ultimaSincronizacao = null;
@@ -174,6 +175,7 @@
     // Executar JS não garante que um botão será mostrado: cada módulo pode
     // restringir internamente a sua própria interface à página/elemento certo.
     if (!interessa(script)) return 'Este endereço não corresponde ao @central-match.';
+    if (carregando.has(script.id)) return 'Módulo baixando em paralelo; será executado assim que estiver pronto.';
     if (!executados.has(script.id)) return 'Ainda não carregado pelo Script Mestre.';
     if (script.id === 'romance-botao-colar-cpf') {
       const campo = document.getElementById('P280_CPF');
@@ -200,7 +202,7 @@
 
   function gerarDiagnostico() {
     const linhas = [
-      'CENTRAL GITHUB V1.7 — DIAGNÓSTICO',
+      'CENTRAL GITHUB V2.0 — DIAGNÓSTICO',
       'Repositório: ' + REPOSITORIO,
       'Página: ' + location.origin + location.pathname,
       'Módulos no catálogo: ' + (catalogo?.scripts?.length || 0),
@@ -213,6 +215,7 @@
       const off = GM_getValue(PREFIXO + 'desligado:' + script.id, false);
       const status = !script.enabled ? 'DESATIVADO NO GITHUB'
         : off ? 'DESATIVADO NO NAVEGADOR'
+        : carregando.has(script.id) ? 'BAIXANDO EM PARALELO'
         : falhas.has(script.id) ? 'ERRO: ' + falhas.get(script.id)
         : atualizacoesPendentes.has(script.id) ? 'NOVA VERSÃO: recarregar'
         : executados.has(script.id) ? 'ARQUIVO EXECUTADO'
@@ -253,26 +256,66 @@
       }
       catalogo = novo;
       falhas.clear();
+
+      // Identifica todos os módulos elegíveis antes de iniciar os downloads.
+      // As requisições começam juntas; cada módulo é executado assim que seu
+      // próprio arquivo chega e passa na validação SHA-256.
+      const candidatos = [];
       for (const script of catalogo.scripts) {
         if (!interessa(script) || !script.enabled || GM_getValue(PREFIXO + 'desligado:' + script.id, false)) continue;
+
         const anterior = executados.get(script.id);
         if (anterior) {
           if (anterior !== script.sha256) atualizacoesPendentes.add(script.id);
           else atualizacoesPendentes.delete(script.id);
           continue;
         }
-        try {
-          const codigo = await obterModulo(script);
-          executar(script, codigo);
-          executados.set(script.id, script.sha256);
-          atualizacoesPendentes.delete(script.id);
-          log('Executado:', script.name, script.version);
-        } catch (e) {
-          falhas.set(script.id, e.message || String(e));
-          erro('Não foi possível executar', script.id, e);
-        }
+        candidatos.push(script);
       }
+
+      if (candidatos.length) {
+        aviso = `Baixando ${candidatos.length} módulo(s) em paralelo...`;
+        candidatos.forEach(script => carregando.add(script.id));
+        atualizarPainel();
+
+        const tarefas = candidatos.map(async script => {
+          const inicio = Date.now();
+          try {
+            const codigo = await obterModulo(script);
+
+            // Respeita um OFF acionado enquanto o arquivo estava sendo baixado.
+            if (!script.enabled ||
+                GM_getValue(PREFIXO + 'desligado:' + script.id, false) ||
+                !interessa(script)) {
+              log('Ignorado após download (desativado ou página alterada):', script.id);
+              return;
+            }
+
+            if (executados.has(script.id)) return;
+
+            executar(script, codigo);
+            executados.set(script.id, script.sha256);
+            atualizacoesPendentes.delete(script.id);
+            log('Executado:', script.name, script.version, `(${Date.now() - inicio} ms)`);
+          } catch (e) {
+            falhas.set(script.id, e.message || String(e));
+            erro('Não foi possível executar', script.id, e);
+          } finally {
+            carregando.delete(script.id);
+            atualizarPainel();
+          }
+        });
+
+        // Cada tarefa trata seu próprio erro; uma falha não bloqueia os demais.
+        await Promise.allSettled(tarefas);
+      }
+
       ultimaSincronizacao = new Date();
+      aviso = falhas.size
+        ? `Catálogo atualizado; ${falhas.size} módulo(s) apresentaram erro. Veja o diagnóstico.`
+        : candidatos.length
+          ? `${candidatos.length} módulo(s) verificados com downloads paralelos.`
+          : 'Catálogo atualizado. Nenhum módulo novo para carregar.';
     } catch (e) {
       aviso = 'Erro ao carregar catálogo: ' + e.message;
       erro(aviso, e);
@@ -367,15 +410,16 @@
     barra.style.setProperty('display', recolhida ? 'none' : 'flex', 'important');
     mostrar.style.setProperty('display', recolhida ? 'block' : 'none', 'important');
     const carregados = relevantes.filter(s => executados.has(s.id)).length;
-    abrir.textContent = `⚙ Central v1.8 ${carregados}/${relevantes.length}`;
+    const baixando = relevantes.filter(s => carregando.has(s.id)).length;
+    abrir.textContent = `⚙ Central v2.0 ${carregados}/${relevantes.length}`;
     painel.style.setProperty('display', painelAberto && !recolhida ? 'block' : 'none', 'important');
     if (!painelAberto) return;
     painel.replaceChildren();
-    painel.appendChild(texto('h3', 'Central GitHub — Diagnóstico V1.7')); 
+    painel.appendChild(texto('h3', 'Central GitHub — Diagnóstico V2.0')); 
     painel.appendChild(texto('p', aviso, 'central-msg'));
     painel.appendChild(texto('p', 'Clique em ‹ para ocultar a Central. Para mostrar novamente, clique na seta › que ficará na borda esquerda da tela.', 'central-legenda'));
 
-    painel.appendChild(texto('p', `${todos.length} script(s) no GitHub • ${relevantes.length} compatível(is) com esta URL • ${carregados} código(s) executado(s)`, 'central-legenda'));
+    painel.appendChild(texto('p', `${todos.length} script(s) no GitHub • ${relevantes.length} compatível(is) com esta URL • ${carregados} executado(s) • ${baixando} baixando em paralelo`, 'central-legenda'));
     painel.appendChild(texto('p', 'Página: ' + location.origin + location.pathname, 'central-legenda'));
     if (ultimaSincronizacao) {
       painel.appendChild(texto('p', 'Última consulta: ' + ultimaSincronizacao.toLocaleTimeString('pt-BR'), 'central-legenda'));
@@ -405,6 +449,7 @@
       if (!script.enabled) situacao = 'Desativado no GitHub';
       else if (!marcar.checked) situacao = 'Desativado neste navegador';
       else if (!correspondePagina) situacao = 'Não é para esta URL';
+      else if (carregando.has(script.id)) situacao = 'Baixando em paralelo...';
       else if (falhas.has(script.id)) situacao = 'ERRO ao executar: ' + falhas.get(script.id);
       else if (atualizacoesPendentes.has(script.id)) situacao = 'Nova versão: recarregue a página';
       else if (executados.has(script.id)) situacao = 'Código executado • v' + script.version;
