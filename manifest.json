@@ -112,7 +112,7 @@
       "name": "Romance | Atalhos da Nota de Venda",
       "version": "1.1.0",
       "file": "scripts/romance-atalhos-nota-de-venda.js",
-      "sha256": "4d1489be8fc3081bed47387e03973bacde93ce4aedc40d8145c5a95f7f8e7ab8",
+      "sha256": "a5a310cac1cb178d604bb37b2f5d4429e78f176e9ae9b2a880c6810951cf3813",
       "matches": [
         "https://*/apex/*",
         "http://*/apex/*",
