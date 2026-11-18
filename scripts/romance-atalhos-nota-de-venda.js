@@ -98,8 +98,8 @@
     margin: '0',
     cursor: 'pointer',
     lineHeight: '1.2',
-    color: '#508223',
-    border: '1px solid #508223'
+    color: '#00FF00',
+    border: '1px solid #00FF00'
 });
             button.addEventListener('click', event => {
                 event.preventDefault();
