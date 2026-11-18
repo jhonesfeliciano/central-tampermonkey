@@ -108,6 +108,22 @@
       "enabled": true
     },
     {
+      "id": "romance-atalhos-nota-de-venda",
+      "name": "Romance | Atalhos da Nota de Venda",
+      "version": "1.1.0",
+      "file": "scripts/romance-atalhos-nota-de-venda.js",
+      "sha256": "4d1489be8fc3081bed47387e03973bacde93ce4aedc40d8145c5a95f7f8e7ab8",
+      "matches": [
+        "https://*/apex/*",
+        "http://*/apex/*",
+        "https://*/ords/*",
+        "http://*/ords/*",
+        "https://*/f?p=2001*",
+        "http://*/f?p=2001*"
+      ],
+      "enabled": true
+    },
+    {
       "id": "romance-botao-colar-cpf",
       "name": "Romance - Botão Colar CPF",
       "version": "1.0",
