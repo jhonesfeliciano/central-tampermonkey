@@ -90,10 +90,17 @@
             button.title = `Ir para ${label}`;
             button.setAttribute('aria-controls', id);
             Object.assign(button.style, {
-                fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap',
-                padding: '5px 8px', minHeight: '26px', margin: '0',
-                cursor: 'pointer', lineHeight: '1.2'
-            });
+    fontSize: '12px',
+    fontWeight: '600',
+    whiteSpace: 'nowrap',
+    padding: '5px 8px',
+    minHeight: '26px',
+    margin: '0',
+    cursor: 'pointer',
+    lineHeight: '1.2',
+    color: '#508223',
+    border: '1px solid #508223'
+});
             button.addEventListener('click', event => {
                 event.preventDefault();
                 event.stopPropagation();
