@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Central GitHub | Script Mestre
 // @namespace    central-github-tampermonkey
-// @version      2.0.0
-// @description  Central V2.0: carregamento paralelo dos módulos compatíveis, com diagnóstico individual.
+// @version      2.1.0
+// @description  Central V2.1: executa do cache local na hora (sem esperar o GitHub) e atualiza em segundo plano.
 // @updateURL    https://raw.githubusercontent.com/jhonesfeliciano/central-tampermonkey/main/mestre.user.js
 // @downloadURL  https://raw.githubusercontent.com/jhonesfeliciano/central-tampermonkey/main/mestre.user.js
 // @match        http://*/*
@@ -124,20 +124,23 @@
   async function obterModulo(script) {
     const chave = PREFIXO + 'modulo:' + script.id;
     const salvo = GM_getValue(chave, null);
-    const endereco = BASE + script.file + '?sha=' + script.sha256 + '&t=' + Date.now();
-    try {
-      const codigo = await requisitar(endereco);
-      await conferirIntegridade(codigo, script.sha256);
-      GM_setValue(chave, { sha256: script.sha256, codigo });
-      return codigo;
-    } catch (e) {
-      if (salvo && salvo.sha256 === script.sha256 && typeof salvo.codigo === 'string') {
-        log(`GitHub indisponível para ${script.id}; usando cópia salva.`);
+
+    // Cache primeiro: se o código salvo é exatamente a versão do catálogo,
+    // não precisa de rede (é isso que faz a página iniciar na hora).
+    if (salvo && salvo.sha256 === script.sha256 && typeof salvo.codigo === 'string') {
+      try {
         await conferirIntegridade(salvo.codigo, script.sha256);
         return salvo.codigo;
+      } catch (e) {
+        log(`Cópia salva de ${script.id} inválida; baixando de novo.`);
       }
-      throw e;
     }
+
+    const endereco = BASE + script.file + '?sha=' + script.sha256 + '&t=' + Date.now();
+    const codigo = await requisitar(endereco);
+    await conferirIntegridade(codigo, script.sha256);
+    GM_setValue(chave, { sha256: script.sha256, codigo });
+    return codigo;
   }
 
   function executar(script, codigo) {
@@ -228,6 +231,77 @@
     return linhas.join('\n');
   }
 
+  // Consulta o catálogo no GitHub. Nunca rejeita: devolve { novo } ou { erro }.
+  async function buscarCatalogo() {
+    try {
+      const texto = await requisitar(BASE + 'manifest.json?t=' + Date.now());
+      const novo = validarCatalogo(JSON.parse(texto));
+      GM_setValue(PREFIXO + 'catalogo', novo);
+      return { novo };
+    } catch (e) {
+      return { erro: e };
+    }
+  }
+
+  // Executa os módulos elegíveis do catálogo atual. Devolve quantos foram iniciados.
+  // Módulo já executado com versão antiga: só baixa a nova para o próximo reload.
+  async function iniciarModulos() {
+    falhas.clear();
+    const candidatos = [];
+    for (const script of catalogo.scripts) {
+      if (!interessa(script) || !script.enabled || GM_getValue(PREFIXO + 'desligado:' + script.id, false)) continue;
+
+      const anterior = executados.get(script.id);
+      if (anterior) {
+        if (anterior !== script.sha256) {
+          atualizacoesPendentes.add(script.id);
+          obterModulo(script).catch(e => log('Não foi possível baixar a nova versão de', script.id, e.message));
+        } else {
+          atualizacoesPendentes.delete(script.id);
+        }
+        continue;
+      }
+      candidatos.push(script);
+    }
+
+    if (candidatos.length) {
+      candidatos.forEach(script => carregando.add(script.id));
+      atualizarPainel();
+
+      const tarefas = candidatos.map(async script => {
+        const inicio = Date.now();
+        try {
+          const codigo = await obterModulo(script);
+
+          // Respeita um OFF acionado enquanto o arquivo estava sendo obtido.
+          if (!script.enabled ||
+              GM_getValue(PREFIXO + 'desligado:' + script.id, false) ||
+              !interessa(script)) {
+            log('Ignorado após download (desativado ou página alterada):', script.id);
+            return;
+          }
+
+          if (executados.has(script.id)) return;
+
+          executar(script, codigo);
+          executados.set(script.id, script.sha256);
+          atualizacoesPendentes.delete(script.id);
+          log('Executado:', script.name, script.version, `(${Date.now() - inicio} ms)`);
+        } catch (e) {
+          falhas.set(script.id, e.message || String(e));
+          erro('Não foi possível executar', script.id, e);
+        } finally {
+          carregando.delete(script.id);
+          atualizarPainel();
+        }
+      });
+
+      // Cada tarefa trata seu próprio erro; uma falha não bloqueia os demais.
+      await Promise.allSettled(tarefas);
+    }
+    return candidatos.length;
+  }
+
   async function sincronizar() {
     if (!REPO_VALIDO) {
       aviso = 'Configure SEU_USUARIO no Script Mestre.';
@@ -241,80 +315,42 @@
     atualizarPainel();
 
     try {
-      let novo;
-      try {
-        const texto = await requisitar(BASE + 'manifest.json?t=' + Date.now());
-        novo = validarCatalogo(JSON.parse(texto));
-        GM_setValue(PREFIXO + 'catalogo', novo);
-        aviso = 'Catálogo atualizado.';
-      } catch (e) {
+      // A rede começa já, em paralelo com a execução instantânea abaixo.
+      const redePromessa = buscarCatalogo();
+      let iniciados = 0;
+
+      // Fase 1 (instantânea): catálogo + código salvos, sem esperar o GitHub.
+      if (!catalogo) {
         const salvo = GM_getValue(PREFIXO + 'catalogo', null);
-        if (!salvo) throw e;
-        novo = validarCatalogo(salvo);
-        aviso = 'Sem acesso ao GitHub. Usando último catálogo salvo.';
-        log(aviso, e.message);
-      }
-      catalogo = novo;
-      falhas.clear();
-
-      // Identifica todos os módulos elegíveis antes de iniciar os downloads.
-      // As requisições começam juntas; cada módulo é executado assim que seu
-      // próprio arquivo chega e passa na validação SHA-256.
-      const candidatos = [];
-      for (const script of catalogo.scripts) {
-        if (!interessa(script) || !script.enabled || GM_getValue(PREFIXO + 'desligado:' + script.id, false)) continue;
-
-        const anterior = executados.get(script.id);
-        if (anterior) {
-          if (anterior !== script.sha256) atualizacoesPendentes.add(script.id);
-          else atualizacoesPendentes.delete(script.id);
-          continue;
-        }
-        candidatos.push(script);
-      }
-
-      if (candidatos.length) {
-        aviso = `Baixando ${candidatos.length} módulo(s) em paralelo...`;
-        candidatos.forEach(script => carregando.add(script.id));
-        atualizarPainel();
-
-        const tarefas = candidatos.map(async script => {
-          const inicio = Date.now();
+        if (salvo) {
           try {
-            const codigo = await obterModulo(script);
-
-            // Respeita um OFF acionado enquanto o arquivo estava sendo baixado.
-            if (!script.enabled ||
-                GM_getValue(PREFIXO + 'desligado:' + script.id, false) ||
-                !interessa(script)) {
-              log('Ignorado após download (desativado ou página alterada):', script.id);
-              return;
-            }
-
-            if (executados.has(script.id)) return;
-
-            executar(script, codigo);
-            executados.set(script.id, script.sha256);
-            atualizacoesPendentes.delete(script.id);
-            log('Executado:', script.name, script.version, `(${Date.now() - inicio} ms)`);
+            catalogo = validarCatalogo(salvo);
+            iniciados += await iniciarModulos();
           } catch (e) {
-            falhas.set(script.id, e.message || String(e));
-            erro('Não foi possível executar', script.id, e);
-          } finally {
-            carregando.delete(script.id);
-            atualizarPainel();
+            catalogo = null;
+            log('Catálogo salvo inválido; aguardando o GitHub.', e.message);
           }
-        });
-
-        // Cada tarefa trata seu próprio erro; uma falha não bloqueia os demais.
-        await Promise.allSettled(tarefas);
+        }
       }
+
+      // Fase 2: confirma o catálogo no GitHub e baixa só o que mudou.
+      const rede = await redePromessa;
+      if (rede.novo) {
+        catalogo = rede.novo;
+        aviso = 'Catálogo atualizado.';
+      } else if (!catalogo) {
+        throw rede.erro;
+      } else {
+        aviso = 'Sem acesso ao GitHub. Usando último catálogo salvo.';
+        log(aviso, rede.erro.message);
+      }
+      iniciados += await iniciarModulos();
 
       ultimaSincronizacao = new Date();
       aviso = falhas.size
         ? `Catálogo atualizado; ${falhas.size} módulo(s) apresentaram erro. Veja o diagnóstico.`
-        : candidatos.length
-          ? `${candidatos.length} módulo(s) verificados com downloads paralelos.`
+        : iniciados
+          ? `${iniciados} módulo(s) iniciado(s).`
           : 'Catálogo atualizado. Nenhum módulo novo para carregar.';
     } catch (e) {
       aviso = 'Erro ao carregar catálogo: ' + e.message;
@@ -560,7 +596,8 @@
     atualizarPainel(true);
   } else {
     sincronizar();
-    setInterval(sincronizar, INTERVALO_MS);
+    // Só consulta o GitHub a cada 3 min se a aba estiver visível.
+    setInterval(() => { if (!document.hidden) sincronizar(); }, INTERVALO_MS);
     window.addEventListener('popstate', () => sincronizar());
     window.addEventListener('hashchange', () => sincronizar());
   }
